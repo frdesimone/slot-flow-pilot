@@ -1,96 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 226 70% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 215 20% 93%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 215 20% 95%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 226 70% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 226 70% 55%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 220 20% 14%;
+    --sidebar-foreground: 215 20% 80%;
+    --sidebar-primary: 226 70% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 20%;
+    --sidebar-accent-foreground: 215 20% 95%;
+    --sidebar-border: 220 15% 22%;
+    --sidebar-ring: 226 70% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Custom tokens */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Wizard */
+    --wizard-active: 226 70% 55%;
+    --wizard-completed: 142 71% 45%;
+    --wizard-pending: 215 16% 70%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Heatmap */
+    --heat-low: 142 71% 45%;
+    --heat-mid: 38 92% 50%;
+    --heat-high: 0 72% 51%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    /* KPI card */
+    --kpi-bg: 226 70% 97%;
+    --kpi-border: 226 50% 88%;
+    --kpi-icon: 226 70% 55%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Chart */
+    --chart-1: 226 70% 55%;
+    --chart-2: 199 89% 48%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 72% 51%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 222 47% 6%;
+    --foreground: 215 20% 93%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 40% 10%;
+    --card-foreground: 215 20% 93%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 40% 10%;
+    --popover-foreground: 215 20% 93%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 226 70% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 215 20% 93%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 215 16% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 226 70% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 215 20% 93%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 226 70% 60%;
+
+    --sidebar-background: 222 47% 4%;
+    --sidebar-foreground: 215 20% 70%;
+    --sidebar-primary: 226 70% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 220 20% 12%;
+    --sidebar-accent-foreground: 215 20% 90%;
+    --sidebar-border: 220 15% 15%;
+    --sidebar-ring: 226 70% 60%;
+
+    --kpi-bg: 226 50% 12%;
+    --kpi-border: 226 40% 20%;
+    --kpi-icon: 226 70% 65%;
+
+    --success: 142 71% 40%;
+    --warning: 38 92% 45%;
+    --info: 199 89% 43%;
+    --heat-low: 142 71% 40%;
+    --heat-mid: 38 92% 45%;
+    --heat-high: 0 62% 45%;
   }
 }
 
@@ -98,8 +133,37 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .wizard-step-active {
+    @apply bg-primary text-primary-foreground;
+  }
+  .wizard-step-completed {
+    background-color: hsl(var(--wizard-completed));
+    color: hsl(var(--success-foreground));
+  }
+  .wizard-step-pending {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+  }
+  .kpi-card {
+    background-color: hsl(var(--kpi-bg));
+    border-color: hsl(var(--kpi-border));
+  }
+  .drop-zone {
+    @apply border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer;
+    border-color: hsl(var(--border));
+  }
+  .drop-zone:hover, .drop-zone-active {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--primary) / 0.05);
+  }
+  .heat-cell {
+    @apply rounded transition-all duration-200 cursor-pointer;
   }
 }
