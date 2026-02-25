@@ -48,10 +48,10 @@ export function Step2DataAudit() {
   const [auditResult, setAuditResult] = useState<ApiAuditResult | null>(null);
 
   const handleRunAudit = async () => {
-    if (!state.maestroFile || !state.pedidosFile) {
+    if (!state.dataFile) {
       toast({
-        title: "Archivos pendientes",
-        description: "Por favor vuelve al Paso 1 y carga Maestro y Pedidos antes de continuar.",
+        title: "Archivo pendiente",
+        description: "Por favor vuelve al Paso 1 y carga el dataset Excel antes de continuar.",
         variant: "destructive",
       });
       return;
@@ -61,8 +61,7 @@ export function Step2DataAudit() {
       setIsLoading(true);
 
       const formData = new FormData();
-      formData.append("pedidos_file", state.pedidosFile);
-      formData.append("maestro_file", state.maestroFile);
+      formData.append("file", state.dataFile);
       formData.append("cycle_days", "15.0");
 
       // Enviar configuración de mapeo al backend

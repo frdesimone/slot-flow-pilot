@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import { generateMockSKUs } from "@/lib/slottingEngine";
-import { Upload, FileSpreadsheet, FileText, CheckCircle2, ArrowRight } from "lucide-react";
+import { FileSpreadsheet, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,8 @@ function DropZone({
   icon: Icon,
   file,
   onFileSelect,
+  large,
+  accept = ".csv,.xlsx,.xls",
 }: {
   title: string;
   subtitle: string;
@@ -22,6 +23,8 @@ function DropZone({
   icon: React.ElementType;
   file: File | null;
   onFileSelect: (file: File) => void;
+  large?: boolean;
+  accept?: string;
 }) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -71,11 +74,11 @@ function DropZone({
         }
       `}
     >
-      <CardContent className="flex flex-col items-center justify-center py-12 px-6 text-center">
+      <CardContent className={`flex flex-col items-center justify-center text-center ${large ? "py-16 px-8" : "py-12 px-6"}`}>
         <input
           ref={inputRef}
           type="file"
-          accept=".csv, .xlsx, .xls"
+          accept={accept}
           className="hidden"
           onChange={handleFileChange}
         />
@@ -105,55 +108,37 @@ function DropZone({
 }
 
 export function Step1DataIngestion() {
-  const { state, updateState, completeStep, setStep, setMaestroFile, setPedidosFile, setMappingConfig } =
-    useSlotting();
+  const { state, updateState, completeStep, setStep, setDataFile, setMappingConfig } = useSlotting();
 
-  const handleMaterials = useCallback(
+  const handleFileSelect = useCallback(
     (file: File) => {
-      setMaestroFile(file);
-    const skus = generateMockSKUs(320);
-    updateState({ materialsUploaded: true, skus });
+      setDataFile(file);
+      updateState({ materialsUploaded: true, transactionsUploaded: true });
     },
-    [setMaestroFile, updateState],
+    [setDataFile, updateState],
   );
 
-  const handleTransactions = useCallback(
-    (file: File) => {
-      setPedidosFile(file);
-      updateState({ transactionsUploaded: true });
-    },
-    [setPedidosFile, updateState],
-  );
-
-  const canProceed = state.materialsUploaded && state.transactionsUploaded;
+  const canProceed = !!state.dataFile;
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Carga de Maestro y Transacciones</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Carga de Dataset de Slotting</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Suba los archivos de datos maestros y transacciones para iniciar el análisis de slotting.
+          Suba un único archivo Excel con las hojas de Maestro y Pedidos para iniciar el análisis.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <DropZone
-          title="Maestro de Materiales"
-          subtitle="Catálogo de SKUs con dimensiones, peso y atributos"
-          formats="Excel (.xlsx) o JSON"
-          icon={FileSpreadsheet}
-          file={state.maestroFile}
-          onFileSelect={handleMaterials}
-        />
-        <DropZone
-          title="Base de Pedidos y Transacciones"
-          subtitle="Historial de órdenes y líneas de pedido"
-          formats="CSV o Excel (.xlsx)"
-          icon={FileText}
-          file={state.pedidosFile}
-          onFileSelect={handleTransactions}
-        />
-      </div>
+      <DropZone
+        title="Dataset de Slotting (Excel único)"
+        subtitle="Un libro Excel con hojas de Maestro de Materiales e Historial de Pedidos"
+        formats="Excel (.xlsx, .xls)"
+        icon={FileSpreadsheet}
+        file={state.dataFile}
+        onFileSelect={handleFileSelect}
+        accept=".xlsx,.xls"
+        large
+      />
 
       <Accordion type="single" collapsible className="border rounded-xl bg-card/60 shadow-sm">
         <AccordionItem value="mapping" className="border-none">
@@ -282,7 +267,7 @@ export function Step1DataIngestion() {
         <div className="flex items-center gap-4 pt-2 animate-slide-in">
           <div className="flex-1 bg-success/10 border border-success/30 rounded-lg px-4 py-3">
             <p className="text-sm text-success font-medium">
-              {state.skus.length} SKUs cargados · Transacciones listas
+              Dataset cargado · Listo para auditoría
             </p>
           </div>
           <Button

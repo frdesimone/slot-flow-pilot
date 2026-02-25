@@ -78,8 +78,7 @@ export interface SlottingState {
   materialsUploaded: boolean;
   transactionsUploaded: boolean;
   skus: SKU[];
-  maestroFile: File | null;
-  pedidosFile: File | null;
+  dataFile: File | null;
   mappingConfig: MappingConfig;
   // Step 2
   auditRun: boolean;
@@ -108,8 +107,7 @@ interface SlottingContextType {
   setStep: (step: number) => void;
   completeStep: (step: number) => void;
   updateState: (partial: Partial<SlottingState>) => void;
-  setMaestroFile: (file: File | null) => void;
-  setPedidosFile: (file: File | null) => void;
+  setDataFile: (file: File | null) => void;
   setMappingConfig: (partial: Partial<MappingConfig>) => void;
 }
 
@@ -140,8 +138,7 @@ const initialState: SlottingState = {
   materialsUploaded: false,
   transactionsUploaded: false,
   skus: [],
-  maestroFile: null,
-  pedidosFile: null,
+  dataFile: null,
   mappingConfig: defaultMappingConfig,
   auditRun: false,
   auditResult: null,
@@ -184,12 +181,8 @@ export function SlottingProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, ...partial }));
   }, []);
 
-  const setMaestroFile = useCallback((file: File | null) => {
-    setState((prev) => ({ ...prev, maestroFile: file }));
-  }, []);
-
-  const setPedidosFile = useCallback((file: File | null) => {
-    setState((prev) => ({ ...prev, pedidosFile: file }));
+  const setDataFile = useCallback((file: File | null) => {
+    setState((prev) => ({ ...prev, dataFile: file }));
   }, []);
 
   const setMappingConfig = useCallback((partial: Partial<MappingConfig>) => {
@@ -204,7 +197,7 @@ export function SlottingProvider({ children }: { children: ReactNode }) {
 
   return (
     <SlottingContext.Provider
-      value={{ state, setStep, completeStep, updateState, setMaestroFile, setPedidosFile, setMappingConfig }}
+      value={{ state, setStep, completeStep, updateState, setDataFile, setMappingConfig }}
     >
       {children}
     </SlottingContext.Provider>
