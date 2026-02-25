@@ -79,7 +79,7 @@ function TrayGrid({ trays, vlmIndex }: { trays: TrayData[]; vlmIndex: number }) 
             <KPIMini label="Llenado Volumen" value={selected?.volumeFill || 0} unit="%" />
             <KPIMini label="Llenado Peso" value={selected?.weightFill || 0} unit="%" />
           </div>
-          <div className="text-xs font-medium mb-2">SKUs Contenidos ({selected?.skus.length})</div>
+          <div className="text-xs font-medium mb-2">SKUs Contenidos ({selected?.skus?.length ?? 0})</div>
           <div className="max-h-48 overflow-auto">
             <Table>
               <TableHeader>
@@ -90,7 +90,7 @@ function TrayGrid({ trays, vlmIndex }: { trays: TrayData[]; vlmIndex: number }) 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selected?.skus.map((s) => (
+                {(selected?.skus ?? []).slice(0, 50).map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-[11px]">{s.id}</TableCell>
                     <TableCell className="text-[11px]">{s.description}</TableCell>
@@ -100,6 +100,11 @@ function TrayGrid({ trays, vlmIndex }: { trays: TrayData[]; vlmIndex: number }) 
               </TableBody>
             </Table>
           </div>
+          {(selected?.skus?.length ?? 0) > 50 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Mostrando los primeros 50 resultados (Total: {selected?.skus?.length ?? 0})
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -149,10 +154,32 @@ export function Step4MicroSlotting() {
       });
 
       if (!response.ok) {
-        throw new Error("Error al ejecutar Micro-Slotting");
+        const errText = await response.text();
+        throw new Error(errText || "Error al ejecutar Micro-Slotting");
       }
 
-      const data = await response.json();
+      let data: import("@/context/SlottingContext").MicroResult;
+      try {
+        const raw = await response.json();
+        const traysPerVLM = Array.isArray(raw?.traysPerVLM) ? raw.traysPerVLM : [];
+        data = {
+          vlmCount: typeof raw?.vlmCount === "number" ? raw.vlmCount : 0,
+          traysPerVLM,
+          heightEfficiency: typeof raw?.heightEfficiency === "number" ? raw.heightEfficiency : 0,
+          areaEfficiency: typeof raw?.areaEfficiency === "number" ? raw.areaEfficiency : 0,
+          avgTraysPerOrder: typeof raw?.avgTraysPerOrder === "number" ? raw.avgTraysPerOrder : 0,
+          replicationCoverage: typeof raw?.replicationCoverage === "number" ? raw.replicationCoverage : 0,
+        };
+      } catch (parseError) {
+        console.error(parseError);
+        toast({
+          title: "Error al interpretar la respuesta",
+          description: parseError instanceof Error ? parseError.message : "La API devolvió datos no válidos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       updateState({ microResult: data });
       completeStep(3);
     } catch (error) {
@@ -291,22 +318,22 @@ export function Step4MicroSlotting() {
             <Tabs defaultValue="vlm-0">
               <div className="px-5 py-3 border-b">
                 <TabsList className="h-9">
-                  {micro.traysPerVLM.map((_, i) => (
+                  {(micro.traysPerVLM ?? []).map((_, i) => (
                     <TabsTrigger key={i} value={`vlm-${i}`} className="text-xs px-4">
                       VLM {i + 1}
-                      <Badge variant="secondary" className="ml-2 text-[10px]">{micro.traysPerVLM[i].length}</Badge>
+                      <Badge variant="secondary" className="ml-2 text-[10px]">{(micro.traysPerVLM ?? [])[i]?.length ?? 0}</Badge>
                     </TabsTrigger>
                   ))}
                 </TabsList>
               </div>
-              {micro.traysPerVLM.map((trays, i) => (
+              {(micro.traysPerVLM ?? []).map((trays, i) => (
                 <TabsContent key={i} value={`vlm-${i}`} className="p-5">
                   <div className="mb-3">
                     <p className="text-xs text-muted-foreground">
                       {trays.length} bandejas ocupadas · Click en una bandeja para ver SKUs contenidos
                     </p>
                   </div>
-                  <TrayGrid trays={trays} vlmIndex={i} />
+                  <TrayGrid trays={trays ?? []} vlmIndex={i} />
                 </TabsContent>
               ))}
             </Tabs>

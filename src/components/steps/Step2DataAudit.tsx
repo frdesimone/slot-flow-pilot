@@ -79,17 +79,37 @@ export function Step2DataAudit() {
       });
 
       if (!response.ok) {
-        throw new Error("Error al ejecutar la auditoría de datos");
+        const errText = await response.text();
+        throw new Error(errText || "Error al ejecutar la auditoría de datos");
       }
 
-      const data = (await response.json()) as ApiAuditResult;
+      let data: ApiAuditResult;
+      try {
+        const raw = await response.json();
+        data = {
+          heavy_skus: typeof raw?.heavy_skus === "number" ? raw.heavy_skus : 0,
+          bulky_skus: typeof raw?.bulky_skus === "number" ? raw.bulky_skus : 0,
+          massive_orders: typeof raw?.massive_orders === "number" ? raw.massive_orders : 0,
+          ubiquitous_skus: Array.isArray(raw?.ubiquitous_skus) ? raw.ubiquitous_skus : [],
+        };
+      } catch (parseError) {
+        console.error(parseError);
+        toast({
+          title: "Error al interpretar la respuesta",
+          description: parseError instanceof Error ? parseError.message : "La API devolvió datos no válidos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       setAuditResult(data);
       updateState({ auditRun: true });
     } catch (error) {
       console.error(error);
+      const message = error instanceof Error ? error.message : "Revisa la API o los archivos cargados e inténtalo nuevamente.";
       toast({
         title: "No se pudo ejecutar la auditoría",
-        description: "Revisa la API o los archivos cargados e inténtalo nuevamente.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -148,7 +168,7 @@ export function Step2DataAudit() {
             <KPICard
               icon={Star}
               label="SKUs Omnipresentes"
-              value={audit.ubiquitous_skus.length}
+              value={(audit.ubiquitous_skus ?? []).length}
               color="bg-primary/10 text-primary"
             />
           </div>
@@ -170,7 +190,7 @@ export function Step2DataAudit() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {audit.ubiquitous_skus.map((sku) => (
+                  {(audit.ubiquitous_skus ?? []).slice(0, 50).map((sku) => (
                     <TableRow key={sku.id}>
                       <TableCell className="font-mono text-xs">{sku.id}</TableCell>
                       <TableCell className="text-sm">{sku.description}</TableCell>
@@ -185,6 +205,9 @@ export function Step2DataAudit() {
                 </TableBody>
               </Table>
             </div>
+            <p className="px-5 py-2 text-xs text-muted-foreground border-t">
+              Mostrando los primeros 50 resultados (Total: {(audit.ubiquitous_skus ?? []).length})
+            </p>
           </Card>
 
           {/* Decision switch */}

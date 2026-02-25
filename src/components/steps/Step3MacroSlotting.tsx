@@ -56,16 +56,34 @@ export function Step3MacroSlotting() {
       });
 
       if (!response.ok) {
-        throw new Error("Error al ejecutar Macro-Slotting");
+        const errText = await response.text();
+        throw new Error(errText || "Error al ejecutar Macro-Slotting");
       }
 
-      const data = await response.json();
+      let data: { storageDistribution?: { storage: string; count: number; percentage: number }[]; saturation?: { zone: string; used: number; capacity: number; percentage: number }[] };
+      try {
+        const raw = await response.json();
+        data = {
+          storageDistribution: Array.isArray(raw?.storageDistribution) ? raw.storageDistribution : [],
+          saturation: Array.isArray(raw?.saturation) ? raw.saturation : [],
+        };
+      } catch (parseError) {
+        console.error(parseError);
+        toast({
+          title: "Error al interpretar la respuesta",
+          description: parseError instanceof Error ? parseError.message : "La API devolvió datos no válidos.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       updateState({ macroResult: data });
     } catch (error) {
       console.error(error);
+      const message = error instanceof Error ? error.message : "Revisa la API o los parámetros de entrada e inténtalo nuevamente.";
       toast({
         title: "No se pudo ejecutar Macro-Slotting",
-        description: "Revisa la API o los parámetros de entrada e inténtalo nuevamente.",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -204,7 +222,7 @@ export function Step3MacroSlotting() {
             </div>
             <CardContent className="py-6">
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={macro.storageDistribution} layout="vertical">
+                <BarChart data={(macro.storageDistribution ?? []).slice(0, 50)} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
                   <YAxis type="category" dataKey="storage" width={120} tick={{ fontSize: 12 }} />
@@ -219,6 +237,9 @@ export function Step3MacroSlotting() {
                   <Bar dataKey="percentage" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name="% SKUs" />
                 </BarChart>
               </ResponsiveContainer>
+              <p className="text-xs text-muted-foreground mt-2">
+                Mostrando los top 50 resultados de {(macro.storageDistribution ?? []).length} zonas
+              </p>
             </CardContent>
           </Card>
 
@@ -239,7 +260,7 @@ export function Step3MacroSlotting() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {macro.saturation.map((s) => (
+                  {(macro.saturation ?? []).slice(0, 50).map((s) => (
                     <TableRow key={s.zone}>
                       <TableCell className="font-medium">{s.zone}</TableCell>
                       <TableCell>{s.used}</TableCell>
@@ -258,6 +279,9 @@ export function Step3MacroSlotting() {
                 </TableBody>
               </Table>
             </div>
+            <p className="px-5 py-2 text-xs text-muted-foreground border-t">
+              Mostrando los top 50 resultados de {(macro.saturation ?? []).length} zonas
+            </p>
           </Card>
         </div>
       )}
