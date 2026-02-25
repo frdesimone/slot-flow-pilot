@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import { runMacroSlotting } from "@/lib/slottingEngine";
 import { StorageType } from "@/context/SlottingContext";
 import { ArrowRight, ArrowLeft, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,23 +9,68 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useToast } from "@/components/ui/use-toast";
 
 export function Step3MacroSlotting() {
   const { state, updateState, completeStep, setStep } = useSlotting();
   const [running, setRunning] = useState(false);
+  const { toast } = useToast();
 
-  const handleRun = () => {
-    setRunning(true);
-    setTimeout(() => {
-      const { skus, result } = runMacroSlotting(
-        state.skus,
-        state.coverageDays,
-        state.storageTypes,
-        state.excludeOutliers
-      );
-      updateState({ skus, macroResult: result });
+  const handleRun = async () => {
+    if (!state.dataFile) {
+      toast({
+        title: "Archivo pendiente",
+        description: "Por favor vuelve al Paso 1 y carga el dataset Excel antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setRunning(true);
+
+      const formData = new FormData();
+      formData.append("file", state.dataFile);
+
+      // Macro-specific params
+      formData.append("cycle_days", String(state.coverageDays));
+      const vlmStorage =
+        state.storageTypes.find((st) => st.id === "vlm") ?? state.storageTypes[0] ?? null;
+      if (vlmStorage) {
+        formData.append("vlm_volume", String(vlmStorage.maxVolume));
+      }
+      // Valor por defecto razonable de ocupación objetivo
+      formData.append("vlm_occupancy", "0.85");
+
+      // Mapping de columnas y hojas
+      Object.entries(state.mappingConfig).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/macro`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al ejecutar Macro-Slotting");
+      }
+
+      const data = await response.json();
+      updateState({ macroResult: data });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "No se pudo ejecutar Macro-Slotting",
+        description: "Revisa la API o los parámetros de entrada e inténtalo nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
       setRunning(false);
-    }, 1200);
+    }
   };
 
   const addStorageType = () => {

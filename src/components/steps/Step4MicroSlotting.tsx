@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import { runMicroSlotting } from "@/lib/slottingEngine";
 import { TrayData } from "@/context/SlottingContext";
 import { ArrowLeft, Play, Settings2, Cpu, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
 
 function KPIMini({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
@@ -109,24 +109,62 @@ function TrayGrid({ trays, vlmIndex }: { trays: TrayData[]; vlmIndex: number }) 
 export function Step4MicroSlotting() {
   const { state, updateState, completeStep, setStep } = useSlotting();
   const [running, setRunning] = useState(false);
+  const { toast } = useToast();
 
-  const handleRun = () => {
-    setRunning(true);
-    setTimeout(() => {
-      const result = runMicroSlotting(
-        state.skus,
-        state.vlmCount,
-        state.traysPerVLM,
-        state.trayWidth,
-        state.trayDepth,
-        state.trayMaxWeight,
-        state.coverageDays,
-        state.replicationFactor
-      );
-      updateState({ microResult: result });
+  const handleRun = async () => {
+    if (!state.dataFile) {
+      toast({
+        title: "Archivo pendiente",
+        description: "Por favor vuelve al Paso 1 y carga el dataset Excel antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setRunning(true);
+
+      const formData = new FormData();
+      formData.append("file", state.dataFile);
+
+      // Parámetros propios de Micro-Slotting
+      formData.append("cycle_days", String(state.coverageDays));
+      formData.append("n_vlms", String(state.vlmCount));
+      formData.append("n_trays_per_vlm", String(state.traysPerVLM));
+      formData.append("include_zero_rot", String(state.includeNoRotation));
+      formData.append("optimize_trays", "true");
+      formData.append("opt_time_ms", "2000");
+
+      // Mapping de columnas y hojas
+      Object.entries(state.mappingConfig).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/micro`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al ejecutar Micro-Slotting");
+      }
+
+      const data = await response.json();
+      updateState({ microResult: data });
       completeStep(3);
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "No se pudo ejecutar Micro-Slotting",
+        description: "Revisa la API o los parámetros de entrada e inténtalo nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
       setRunning(false);
-    }, 2000);
+    }
   };
 
   const micro = state.microResult;
