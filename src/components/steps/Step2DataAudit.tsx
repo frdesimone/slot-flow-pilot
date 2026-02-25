@@ -1,14 +1,31 @@
 import { useState } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import { runAudit } from "@/lib/slottingEngine";
 import { ArrowRight, ArrowLeft, Zap, Weight, Box, ShoppingCart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 
-function KPICard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string | number; color: string }) {
+type ApiAuditResult = {
+  heavy_skus: number;
+  bulky_skus: number;
+  massive_orders: number;
+  ubiquitous_skus: { id: string; description: string; appearances: number; percentage: number }[];
+};
+
+function KPICard({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  color: string;
+}) {
   return (
     <Card className="kpi-card border">
       <CardContent className="flex items-center gap-4 py-5 px-5">
@@ -26,18 +43,56 @@ function KPICard({ icon: Icon, label, value, color }: { icon: React.ElementType;
 
 export function Step2DataAudit() {
   const { state, updateState, completeStep, setStep } = useSlotting();
-  const [running, setRunning] = useState(false);
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [auditResult, setAuditResult] = useState<ApiAuditResult | null>(null);
 
-  const handleRunAudit = () => {
-    setRunning(true);
-    setTimeout(() => {
-      const result = runAudit(state.skus);
-      updateState({ auditRun: true, auditResult: result });
-      setRunning(false);
-    }, 1500);
+  const handleRunAudit = async () => {
+    if (!state.maestroFile || !state.pedidosFile) {
+      toast({
+        title: "Archivos pendientes",
+        description: "Por favor vuelve al Paso 1 y carga Maestro y Pedidos antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const formData = new FormData();
+      formData.append("pedidos_file", state.pedidosFile);
+      formData.append("maestro_file", state.maestroFile);
+      formData.append("cycle_days", "15.0");
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/outliers`, {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer token_desarrollo_local_123",
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al ejecutar la auditoría de datos");
+      }
+
+      const data = (await response.json()) as ApiAuditResult;
+      setAuditResult(data);
+      updateState({ auditRun: true });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "No se pudo ejecutar la auditoría",
+        description: "Revisa la API o los archivos cargados e inténtalo nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const audit = state.auditResult;
+  const audit = auditResult;
 
   return (
     <div className="space-y-8">
@@ -49,17 +104,17 @@ export function Step2DataAudit() {
           </p>
         </div>
         {!state.auditRun && (
-          <Button onClick={handleRunAudit} disabled={running} className="gap-2" size="lg">
+          <Button onClick={handleRunAudit} disabled={isLoading} className="gap-2" size="lg">
             <Zap className="w-4 h-4" />
-            {running ? "Analizando..." : "Ejecutar Auditoría"}
+            {isLoading ? "Analizando..." : "Ejecutar Auditoría"}
           </Button>
         )}
       </div>
 
-      {running && (
+      {isLoading && (
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="ml-3 text-sm text-muted-foreground">Procesando {state.skus.length} SKUs...</p>
+          <p className="ml-3 text-sm text-muted-foreground">Procesando auditoría de datos...</p>
         </div>
       )}
 
@@ -67,10 +122,30 @@ export function Step2DataAudit() {
         <div className="space-y-6 animate-slide-in">
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard icon={Weight} label="SKUs >25kg" value={audit.heavySKUs} color="bg-destructive/10 text-destructive" />
-            <KPICard icon={Box} label="SKUs Voluminosos" value={audit.bulkySKUs} color="bg-warning/10 text-warning" />
-            <KPICard icon={ShoppingCart} label="Pedidos B2B" value={audit.b2bOrders} color="bg-info/10 text-info" />
-            <KPICard icon={Star} label="SKUs Omnipresentes" value={audit.omnipresentSKUs.length} color="bg-primary/10 text-primary" />
+            <KPICard
+              icon={Weight}
+              label="SKUs >25kg"
+              value={audit.heavy_skus}
+              color="bg-destructive/10 text-destructive"
+            />
+            <KPICard
+              icon={Box}
+              label="SKUs Voluminosos"
+              value={audit.bulky_skus}
+              color="bg-warning/10 text-warning"
+            />
+            <KPICard
+              icon={ShoppingCart}
+              label="Pedidos B2B"
+              value={audit.massive_orders}
+              color="bg-info/10 text-info"
+            />
+            <KPICard
+              icon={Star}
+              label="SKUs Omnipresentes"
+              value={audit.ubiquitous_skus.length}
+              color="bg-primary/10 text-primary"
+            />
           </div>
 
           {/* Omnipresent SKUs table */}
@@ -90,7 +165,7 @@ export function Step2DataAudit() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {audit.omnipresentSKUs.map((sku) => (
+                  {audit.ubiquitous_skus.map((sku) => (
                     <TableRow key={sku.id}>
                       <TableCell className="font-mono text-xs">{sku.id}</TableCell>
                       <TableCell className="text-sm">{sku.description}</TableCell>

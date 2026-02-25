@@ -64,6 +64,8 @@ export interface SlottingState {
   materialsUploaded: boolean;
   transactionsUploaded: boolean;
   skus: SKU[];
+  maestroFile: File | null;
+  pedidosFile: File | null;
   // Step 2
   auditRun: boolean;
   auditResult: AuditResult | null;
@@ -91,6 +93,8 @@ interface SlottingContextType {
   setStep: (step: number) => void;
   completeStep: (step: number) => void;
   updateState: (partial: Partial<SlottingState>) => void;
+  setMaestroFile: (file: File | null) => void;
+  setPedidosFile: (file: File | null) => void;
 }
 
 const defaultStorageTypes: StorageType[] = [
@@ -106,6 +110,8 @@ const initialState: SlottingState = {
   materialsUploaded: false,
   transactionsUploaded: false,
   skus: [],
+  maestroFile: null,
+  pedidosFile: null,
   auditRun: false,
   auditResult: null,
   excludeOutliers: true,
@@ -147,8 +153,18 @@ export function SlottingProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, ...partial }));
   }, []);
 
+  const setMaestroFile = useCallback((file: File | null) => {
+    setState((prev) => ({ ...prev, maestroFile: file }));
+  }, []);
+
+  const setPedidosFile = useCallback((file: File | null) => {
+    setState((prev) => ({ ...prev, pedidosFile: file }));
+  }, []);
+
   return (
-    <SlottingContext.Provider value={{ state, setStep, completeStep, updateState }}>
+    <SlottingContext.Provider
+      value={{ state, setStep, completeStep, updateState, setMaestroFile, setPedidosFile }}
+    >
       {children}
     </SlottingContext.Provider>
   );

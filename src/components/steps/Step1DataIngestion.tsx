@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useSlotting } from "@/context/SlottingContext";
 import { generateMockSKUs } from "@/lib/slottingEngine";
 import { Upload, FileSpreadsheet, FileText, CheckCircle2, ArrowRight } from "lucide-react";
@@ -11,66 +11,90 @@ function DropZone({
   subtitle,
   formats,
   icon: Icon,
-  uploaded,
-  onDrop,
+  file,
+  onFileSelect,
 }: {
   title: string;
   subtitle: string;
   formats: string;
   icon: React.ElementType;
-  uploaded: boolean;
-  onDrop: () => void;
+  file: File | null;
+  onFileSelect: (file: File) => void;
 }) {
   const [dragging, setDragging] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleClick = useCallback(() => {
-    if (uploaded || loading) return;
-    setLoading(true);
-    setProgress(0);
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setLoading(false);
-          onDrop();
-          return 100;
-        }
-        return p + Math.random() * 18 + 5;
-      });
-    }, 200);
-  }, [uploaded, loading, onDrop]);
+    inputRef.current?.click();
+  }, []);
+
+  const handleFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFile = event.target.files?.[0];
+      if (selectedFile) {
+        onFileSelect(selectedFile);
+      }
+    },
+    [onFileSelect],
+  );
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDragging(false);
+      const droppedFile = event.dataTransfer.files?.[0];
+      if (droppedFile) {
+        onFileSelect(droppedFile);
+      }
+    },
+    [onFileSelect],
+  );
 
   return (
     <Card
       onClick={handleClick}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
       onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); handleClick(); }}
+      onDrop={handleDrop}
       className={`relative overflow-hidden transition-all duration-200 cursor-pointer border-2 border-dashed
-        ${uploaded ? "border-success/50 bg-success/5" : dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-primary/5"}
+        ${
+          file
+            ? "border-success/50 bg-success/5"
+            : dragging
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary/50 hover:bg-primary/5"
+        }
       `}
     >
       <CardContent className="flex flex-col items-center justify-center py-12 px-6 text-center">
-        <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 ${uploaded ? "bg-success/10" : "bg-kpi-bg"}`}>
-          {uploaded ? (
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv, .xlsx, .xls"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+        <div
+          className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 ${
+            file ? "bg-success/10" : "bg-kpi-bg"
+          }`}
+        >
+          {file ? (
             <CheckCircle2 className="w-7 h-7 text-success" />
           ) : (
             <Icon className="w-7 h-7 text-kpi-icon" />
           )}
         </div>
         <h3 className="text-sm font-semibold mb-1">{title}</h3>
-        <p className="text-xs text-muted-foreground mb-3">{subtitle}</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          {file ? file.name : subtitle}
+        </p>
         <p className="text-[11px] text-muted-foreground/70">{formats}</p>
 
-        {loading && (
-          <div className="w-full mt-4 space-y-1.5">
-            <Progress value={Math.min(progress, 100)} className="h-1.5" />
-            <p className="text-[11px] text-muted-foreground">Procesando archivo...</p>
-          </div>
-        )}
-        {uploaded && (
+        {file && (
           <p className="text-xs text-success font-medium mt-3">✓ Cargado exitosamente</p>
         )}
       </CardContent>
@@ -79,16 +103,24 @@ function DropZone({
 }
 
 export function Step1DataIngestion() {
-  const { state, updateState, completeStep, setStep } = useSlotting();
+  const { state, updateState, completeStep, setStep, setMaestroFile, setPedidosFile } = useSlotting();
 
-  const handleMaterials = useCallback(() => {
+  const handleMaterials = useCallback(
+    (file: File) => {
+      setMaestroFile(file);
     const skus = generateMockSKUs(320);
     updateState({ materialsUploaded: true, skus });
-  }, [updateState]);
+    },
+    [setMaestroFile, updateState],
+  );
 
-  const handleTransactions = useCallback(() => {
-    updateState({ transactionsUploaded: true });
-  }, [updateState]);
+  const handleTransactions = useCallback(
+    (file: File) => {
+      setPedidosFile(file);
+      updateState({ transactionsUploaded: true });
+    },
+    [setPedidosFile, updateState],
+  );
 
   const canProceed = state.materialsUploaded && state.transactionsUploaded;
 
@@ -107,16 +139,16 @@ export function Step1DataIngestion() {
           subtitle="Catálogo de SKUs con dimensiones, peso y atributos"
           formats="Excel (.xlsx) o JSON"
           icon={FileSpreadsheet}
-          uploaded={state.materialsUploaded}
-          onDrop={handleMaterials}
+          file={state.maestroFile}
+          onFileSelect={handleMaterials}
         />
         <DropZone
           title="Base de Pedidos y Transacciones"
           subtitle="Historial de órdenes y líneas de pedido"
           formats="CSV o Excel (.xlsx)"
           icon={FileText}
-          uploaded={state.transactionsUploaded}
-          onDrop={handleTransactions}
+          file={state.pedidosFile}
+          onFileSelect={handleTransactions}
         />
       </div>
 
