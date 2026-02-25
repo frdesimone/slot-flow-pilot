@@ -68,7 +68,8 @@ export function Step2DataAudit() {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/outliers`, {
         method: "POST",
         headers: {
-          Authorization: "Bearer token_desarrollo_local_123",
+          // Usamos template literals para inyectar la variable VITE_API_TOKEN
+          Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
         },
         body: formData,
       });
