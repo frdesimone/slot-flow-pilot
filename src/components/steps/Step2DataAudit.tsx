@@ -208,18 +208,18 @@ export function Step2DataAudit() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Navigation */}
-          <div className="flex justify-between pt-2">
-            <Button variant="outline" onClick={() => setStep(0)} className="gap-2">
-              <ArrowLeft className="w-4 h-4" /> Anterior
-            </Button>
-            <Button onClick={() => { completeStep(1); setStep(2); }} className="gap-2">
-              Siguiente <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
         </div>
       )}
+
+      {/* Navigation: siempre visible para poder saltar al Macro sin ejecutar auditoría */}
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={() => setStep(0)} className="gap-2">
+          <ArrowLeft className="w-4 h-4" /> Anterior
+        </Button>
+        <Button onClick={() => setStep(2)} className="gap-2">
+          Siguiente <ArrowRight className="w-4 h-4" />
+        </Button>
+      </div>
     </div>
   );
 }

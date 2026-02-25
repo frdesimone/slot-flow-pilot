@@ -314,6 +314,16 @@ export function Step4MicroSlotting() {
         </div>
       )}
 
+      {!micro && !running && (
+        <Card className="border-dashed bg-muted/30">
+          <CardContent className="py-10 px-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Aún no hay resultados. Configura los parámetros arriba y haz clic en <strong>Ejecutar Micro-Slotting</strong> para ver la distribución de bandejas.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Navigation */}
       <div className="flex justify-between pt-2">
         <Button variant="outline" onClick={() => setStep(2)} className="gap-2">

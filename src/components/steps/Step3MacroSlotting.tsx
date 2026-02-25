@@ -198,7 +198,6 @@ export function Step3MacroSlotting() {
       {/* Results */}
       {macro && (
         <div className="space-y-6 animate-slide-in">
-          {/* Stacked bar chart */}
           <Card>
             <div className="px-5 py-4 border-b">
               <h3 className="text-sm font-semibold">Distribución de SKUs por Tipo de Almacenamiento</h3>
@@ -263,16 +262,24 @@ export function Step3MacroSlotting() {
         </div>
       )}
 
+      {!macro && !running && (
+        <Card className="border-dashed bg-muted/30">
+          <CardContent className="py-10 px-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Aún no hay resultados. Configura los parámetros arriba y haz clic en <strong>Ejecutar Macro-Slotting</strong> para ver la distribución y saturación.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Navigation */}
       <div className="flex justify-between pt-2">
         <Button variant="outline" onClick={() => setStep(1)} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Anterior
         </Button>
-        {macro && (
-          <Button onClick={() => { completeStep(2); setStep(3); }} className="gap-2">
-            Siguiente <ArrowRight className="w-4 h-4" />
-          </Button>
-        )}
+        <Button onClick={() => { completeStep(2); setStep(3); }} className="gap-2">
+          Siguiente <ArrowRight className="w-4 h-4" />
+        </Button>
       </div>
     </div>
   );

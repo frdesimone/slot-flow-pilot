@@ -32,7 +32,8 @@ export function WizardSidebar() {
         {steps.map((step, idx) => {
           const isActive = state.currentStep === idx;
           const isCompleted = state.completedSteps.includes(idx);
-          const isAccessible = idx === 0 || state.completedSteps.includes(idx - 1);
+          const hasDataFile = state.dataFile !== null;
+          const isAccessible = idx === 0 || (idx >= 1 && hasDataFile);
           const Icon = step.icon;
 
           return (
