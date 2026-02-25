@@ -65,6 +65,11 @@ export function Step2DataAudit() {
       formData.append("maestro_file", state.maestroFile);
       formData.append("cycle_days", "15.0");
 
+      // Enviar configuración de mapeo al backend
+      Object.entries(state.mappingConfig).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/outliers`, {
         method: "POST",
         headers: {

@@ -57,6 +57,20 @@ export interface MicroResult {
   replicationCoverage: number;
 }
 
+export interface MappingConfig {
+  sheet_maestro: string;
+  col_sku_maestro: string;
+  col_volumen: string;
+  col_peso: string;
+  col_alto: string;
+  col_ancho: string;
+  col_largo: string;
+  sheet_pedidos: string;
+  col_pedido_id: string;
+  col_pedido_sku: string;
+  col_pedido_cant: string;
+}
+
 export interface SlottingState {
   currentStep: number;
   completedSteps: number[];
@@ -66,6 +80,7 @@ export interface SlottingState {
   skus: SKU[];
   maestroFile: File | null;
   pedidosFile: File | null;
+  mappingConfig: MappingConfig;
   // Step 2
   auditRun: boolean;
   auditResult: AuditResult | null;
@@ -95,6 +110,7 @@ interface SlottingContextType {
   updateState: (partial: Partial<SlottingState>) => void;
   setMaestroFile: (file: File | null) => void;
   setPedidosFile: (file: File | null) => void;
+  setMappingConfig: (partial: Partial<MappingConfig>) => void;
 }
 
 const defaultStorageTypes: StorageType[] = [
@@ -104,6 +120,20 @@ const defaultStorageTypes: StorageType[] = [
   { id: "rack-pallet", priority: 4, name: "Rack Pallet", maxVolume: 50.0, maxWeight: 3000 },
 ];
 
+const defaultMappingConfig: MappingConfig = {
+  sheet_maestro: "Base Cód.",
+  col_sku_maestro: "Material",
+  col_volumen: "M3/UMB",
+  col_peso: "KG/UMB",
+  col_alto: "Alto",
+  col_ancho: "Ancho",
+  col_largo: "Largo",
+  sheet_pedidos: "Pedidos",
+  col_pedido_id: "Nro pedido",
+  col_pedido_sku: "Codigo II - Producto",
+  col_pedido_cant: "Cantidad unidades",
+};
+
 const initialState: SlottingState = {
   currentStep: 0,
   completedSteps: [],
@@ -112,6 +142,7 @@ const initialState: SlottingState = {
   skus: [],
   maestroFile: null,
   pedidosFile: null,
+  mappingConfig: defaultMappingConfig,
   auditRun: false,
   auditResult: null,
   excludeOutliers: true,
@@ -161,9 +192,19 @@ export function SlottingProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, pedidosFile: file }));
   }, []);
 
+  const setMappingConfig = useCallback((partial: Partial<MappingConfig>) => {
+    setState((prev) => ({
+      ...prev,
+      mappingConfig: {
+        ...prev.mappingConfig,
+        ...partial,
+      },
+    }));
+  }, []);
+
   return (
     <SlottingContext.Provider
-      value={{ state, setStep, completeStep, updateState, setMaestroFile, setPedidosFile }}
+      value={{ state, setStep, completeStep, updateState, setMaestroFile, setPedidosFile, setMappingConfig }}
     >
       {children}
     </SlottingContext.Provider>

@@ -4,7 +4,9 @@ import { generateMockSKUs } from "@/lib/slottingEngine";
 import { Upload, FileSpreadsheet, FileText, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 function DropZone({
   title,
@@ -103,7 +105,8 @@ function DropZone({
 }
 
 export function Step1DataIngestion() {
-  const { state, updateState, completeStep, setStep, setMaestroFile, setPedidosFile } = useSlotting();
+  const { state, updateState, completeStep, setStep, setMaestroFile, setPedidosFile, setMappingConfig } =
+    useSlotting();
 
   const handleMaterials = useCallback(
     (file: File) => {
@@ -151,6 +154,129 @@ export function Step1DataIngestion() {
           onFileSelect={handleTransactions}
         />
       </div>
+
+      <Accordion type="single" collapsible className="border rounded-xl bg-card/60 shadow-sm">
+        <AccordionItem value="mapping" className="border-none">
+          <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+            Configuración avanzada de mapeo de columnas
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 pt-0">
+            <p className="text-xs text-muted-foreground mb-4">
+              Ajusta los nombres de hojas y columnas exactamente como aparecen en tus archivos Excel/CSV.
+              La coincidencia será case-insensitive en el backend.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <Card className="border-dashed">
+                <CardContent className="pt-4 space-y-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Maestro de Materiales
+                  </h3>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Hoja de Excel (sheet_maestro)</Label>
+                    <Input
+                      value={state.mappingConfig.sheet_maestro}
+                      onChange={(e) => setMappingConfig({ sheet_maestro: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Columna SKU (col_sku_maestro)</Label>
+                    <Input
+                      value={state.mappingConfig.col_sku_maestro}
+                      onChange={(e) => setMappingConfig({ col_sku_maestro: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Volumen (col_volumen)</Label>
+                      <Input
+                        value={state.mappingConfig.col_volumen}
+                        onChange={(e) => setMappingConfig({ col_volumen: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Peso (col_peso)</Label>
+                      <Input
+                        value={state.mappingConfig.col_peso}
+                        onChange={(e) => setMappingConfig({ col_peso: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Alto (col_alto)</Label>
+                      <Input
+                        value={state.mappingConfig.col_alto}
+                        onChange={(e) => setMappingConfig({ col_alto: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Ancho (col_ancho)</Label>
+                      <Input
+                        value={state.mappingConfig.col_ancho}
+                        onChange={(e) => setMappingConfig({ col_ancho: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Largo (col_largo)</Label>
+                      <Input
+                        value={state.mappingConfig.col_largo}
+                        onChange={(e) => setMappingConfig({ col_largo: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-dashed">
+                <CardContent className="pt-4 space-y-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Historial de Pedidos
+                  </h3>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Hoja de Excel (sheet_pedidos)</Label>
+                    <Input
+                      value={state.mappingConfig.sheet_pedidos}
+                      onChange={(e) => setMappingConfig({ sheet_pedidos: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Columna ID Pedido (col_pedido_id)</Label>
+                    <Input
+                      value={state.mappingConfig.col_pedido_id}
+                      onChange={(e) => setMappingConfig({ col_pedido_id: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Columna SKU Pedido (col_pedido_sku)</Label>
+                    <Input
+                      value={state.mappingConfig.col_pedido_sku}
+                      onChange={(e) => setMappingConfig({ col_pedido_sku: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Columna Cantidad (col_pedido_cant)</Label>
+                    <Input
+                      value={state.mappingConfig.col_pedido_cant}
+                      onChange={(e) => setMappingConfig({ col_pedido_cant: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {canProceed && (
         <div className="flex items-center gap-4 pt-2 animate-slide-in">
