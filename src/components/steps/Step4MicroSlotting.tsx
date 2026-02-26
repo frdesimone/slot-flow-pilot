@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSlotting } from "@/context/SlottingContext";
 import { TrayData } from "@/context/SlottingContext";
-import { ArrowLeft, Play, Settings2, Download } from "lucide-react";
+import { ArrowLeft, Play, Settings2, Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,29 @@ function KPIMini({ label, value, unit }: { label: string; value: string | number
       </p>
     </div>
   );
+}
+
+function extractSkuId(obj: Record<string, unknown>): string | null {
+  const keys = ["id", "sku_id", "material", "codigo"];
+  for (const k of keys) {
+    const v = obj[k];
+    if (v != null && typeof v === "string") return v;
+    if (v != null && typeof v === "number") return String(v);
+  }
+  return null;
+}
+
+function getVlmSkusIds(macroResult: { macro_skus?: Array<Record<string, unknown>>; kpi?: { allocations?: Record<string, unknown> } } | null): string[] {
+  if (!macroResult?.macro_skus?.length) return [];
+  const allocations = macroResult.kpi?.allocations ?? {};
+  const targetType = (Object.keys(allocations)[0] ?? "VLM").toUpperCase();
+  return (macroResult.macro_skus as Array<Record<string, unknown>>)
+    .filter((row) => {
+      const st = row.storage_type ?? row.storageType;
+      return st != null && String(st).toUpperCase() === targetType;
+    })
+    .map(extractSkuId)
+    .filter((id): id is string => id != null);
 }
 
 function downloadMicroCSV(traysPerVLM: TrayData[][]) {
@@ -136,11 +159,24 @@ export function Step4MicroSlotting() {
   const [running, setRunning] = useState(false);
   const { toast } = useToast();
 
+  const macroResult = state.macroResult;
+  const vlmSkusIds = getVlmSkusIds(macroResult);
+  const hasMacroResults = (macroResult?.macro_skus?.length ?? 0) > 0;
+
   const handleRun = async () => {
     if (!state.dataFile) {
       toast({
         title: "Archivo pendiente",
         description: "Por favor vuelve al Paso 1 y carga el dataset Excel antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!hasMacroResults) {
+      toast({
+        title: "Macro Slotting pendiente",
+        description: "Debes ejecutar el Macro Slotting primero para identificar qué SKUs irán al VLM.",
         variant: "destructive",
       });
       return;
@@ -160,11 +196,15 @@ export function Step4MicroSlotting() {
       formData.append("optimize_trays", "true");
       formData.append("opt_time_ms", "2000");
 
+      // SKUs asignados al VLM por el Macro (sincronización Paso 3 → Paso 4)
+      formData.append("vlm_skus_ids", JSON.stringify(vlmSkusIds));
+
       // Mapping de columnas y hojas
       Object.entries(state.mappingConfig).forEach(([key, value]) => {
         formData.append(key, value);
       });
 
+      // Sin timeout en cliente: el análisis puede tardar varios minutos
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/micro`, {
         method: "POST",
         headers: {
@@ -204,11 +244,19 @@ export function Step4MicroSlotting() {
       completeStep(3);
     } catch (error) {
       console.error(error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      const isNetworkError =
+        (error instanceof TypeError && error.message === "Failed to fetch") ||
+        err.name === "AbortError" ||
+        (err.message?.toLowerCase?.() ?? "").includes("network");
       toast({
         title: "No se pudo ejecutar Micro-Slotting",
-        description: "Revisa la API o los parámetros de entrada e inténtalo nuevamente.",
+        description: isNetworkError
+          ? "La conexión se interrumpió o el servidor tardó demasiado. Los resultados anteriores se mantienen. Intenta ejecutar de nuevo."
+          : err.message || "Revisa la API o los parámetros de entrada e inténtalo nuevamente.",
         variant: "destructive",
       });
+      // No actualizamos microResult en error: los resultados previos se preservan
     } finally {
       setRunning(false);
     }
@@ -224,23 +272,47 @@ export function Step4MicroSlotting() {
           <p className="text-sm text-muted-foreground mt-1">
             Configure el hardware y algoritmos de clustering para la asignación física de bandejas.
           </p>
+          {hasMacroResults && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {vlmSkusIds.length} SKUs seleccionados por el Macro Slotting para VLM.
+            </p>
+          )}
         </div>
-        <Button onClick={handleRun} disabled={running} className="gap-2" size="lg">
+        <Button onClick={handleRun} disabled={running || !hasMacroResults} className="gap-2" size="lg">
           <Play className="w-4 h-4" />
           {running ? "Optimizando..." : "Ejecutar Micro-Slotting"}
         </Button>
       </div>
 
-      {/* Parámetros principales (Clustering y Replicación usan valores por defecto del contexto) */}
+      {/* Advertencia si no hay resultados del Macro */}
+      {!hasMacroResults && (
+        <Card className="border-amber-500/50 bg-amber-500/10">
+          <CardContent className="flex items-start gap-3 py-4">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Debes ejecutar el Macro Slotting primero</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                El Micro Slotting necesita los resultados del Paso 3 para identificar qué SKUs irán al VLM. Ve al Paso 3 y haz clic en &quot;Ejecutar Macro-Slotting&quot;.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Parámetros principales */}
       <Card>
         <div className="px-5 py-4 border-b">
           <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Settings2 className="w-4 h-4 text-kpi-icon" /> Parámetros de Hardware
+            <Settings2 className="w-4 h-4 text-kpi-icon" /> Parámetros
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Cantidad de VLMs, bandejas y dimensiones</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Días de cobertura, hardware y dimensiones</p>
         </div>
         <CardContent className="py-5">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Días de Cobertura (cycle days)</Label>
+              <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: parseInt(e.target.value) || 15 })} className="h-9" />
+            </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Cantidad VLMs</Label>
               <Input type="number" value={state.vlmCount} onChange={(e) => updateState({ vlmCount: parseInt(e.target.value) || 4 })} className="h-9" />
@@ -266,13 +338,23 @@ export function Step4MicroSlotting() {
       </Card>
 
       {running && (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="ml-3 text-sm text-muted-foreground">Optimizando distribución física...</p>
-        </div>
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="text-center space-y-1">
+              <p className="text-sm font-medium">Analizando afinidades y optimizando bandejas...</p>
+              <p className="text-xs text-muted-foreground max-w-md">
+                Procesando {vlmSkusIds.length} SKUs seleccionados por el Macro Slotting.
+              </p>
+              <p className="text-xs text-muted-foreground max-w-md">
+                Esto puede demorar un par de minutos. No cierres esta ventana ni recargues la página.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Results */}
+      {/* Results: se muestran aunque esté running, para no perder resultados previos si hay error */}
       {micro && (
         <div className="space-y-6 animate-slide-in">
           {/* KPIs */}
