@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSlotting, type MacroResult } from "@/context/SlottingContext";
-import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package } from "lucide-react";
+import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,33 @@ function extractId(obj: Record<string, unknown>): string | null {
     if (v != null && typeof v === "number") return String(v);
   }
   return null;
+}
+
+function downloadMacroCSV(macroSkus: Array<Record<string, unknown>>) {
+  const getVal = (row: Record<string, unknown>, ...keys: string[]) => {
+    for (const k of keys) {
+      const v = row[k];
+      if (v != null) return String(v);
+    }
+    return "";
+  };
+  const rows: string[][] = [["SKU ID", "Storage Type", "Volume Cycle", "ABC Class"]];
+  macroSkus.forEach((row) => {
+    rows.push([
+      getVal(row, "id", "sku_id", "material", "codigo"),
+      getVal(row, "storage_type"),
+      getVal(row, "volume_cycle", "cycle_volume"),
+      getVal(row, "abc_class"),
+    ]);
+  });
+  const csv = rows.map((r) => r.map((c) => (c.includes(",") || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `macro_slotting_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function extractOrderId(obj: Record<string, unknown>): string | null {
@@ -345,11 +372,22 @@ export function Step3MacroSlotting() {
           {/* Tabla macro_skus */}
           {macroSkus.length > 0 && (
             <Card>
-              <div className="px-5 py-4 border-b">
-                <h3 className="text-sm font-semibold">SKUs Asignados (macro_skus)</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Mostrando los primeros 50 resultados (Total: {macroSkus.length})
-                </p>
+              <div className="px-5 py-4 border-b flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">SKUs Asignados (macro_skus)</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Mostrando los primeros 50 resultados (Total: {macroSkus.length})
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => downloadMacroCSV(macroSkus)}
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar a CSV
+                </Button>
               </div>
               <div className="overflow-auto">
                 <Table>

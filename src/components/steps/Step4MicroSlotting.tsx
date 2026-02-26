@@ -1,17 +1,13 @@
 import { useState } from "react";
 import { useSlotting } from "@/context/SlottingContext";
 import { TrayData } from "@/context/SlottingContext";
-import { ArrowLeft, Play, Settings2, Cpu, Shuffle } from "lucide-react";
+import { ArrowLeft, Play, Settings2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,6 +21,30 @@ function KPIMini({ label, value, unit }: { label: string; value: string | number
       </p>
     </div>
   );
+}
+
+function downloadMicroCSV(traysPerVLM: TrayData[][]) {
+  const rows: string[][] = [["SKU ID", "Tray ID", "VLM ID", "Slot/Position"]];
+  traysPerVLM.forEach((trays, vlmIdx) => {
+    trays.forEach((tray) => {
+      (tray.skus ?? []).forEach((sku, slotIdx) => {
+        rows.push([
+          String(sku.id ?? ""),
+          String(tray.id ?? ""),
+          String(tray.vlmId ?? vlmIdx + 1),
+          String(tray.groupId ?? slotIdx + 1),
+        ]);
+      });
+    });
+  });
+  const csv = rows.map((r) => r.map((c) => (c.includes(",") || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `micro_slotting_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function getHeatColor(fill: number): string {
@@ -211,89 +231,39 @@ export function Step4MicroSlotting() {
         </Button>
       </div>
 
-      {/* Config accordion */}
-      <Accordion type="multiple" defaultValue={["hardware", "clustering", "strategy"]} className="space-y-3">
-        <AccordionItem value="hardware" className="border rounded-lg px-4">
-          <AccordionTrigger className="text-sm font-semibold gap-2 py-3">
-            <span className="flex items-center gap-2"><Settings2 className="w-4 h-4 text-kpi-icon" /> Hardware VLM</span>
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Cantidad VLMs</Label>
-                <Input type="number" value={state.vlmCount} onChange={(e) => updateState({ vlmCount: parseInt(e.target.value) || 4 })} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Bandejas/VLM</Label>
-                <Input type="number" value={state.traysPerVLM} onChange={(e) => updateState({ traysPerVLM: parseInt(e.target.value) || 50 })} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Ancho (m)</Label>
-                <Input type="number" step="0.1" value={state.trayWidth} onChange={(e) => updateState({ trayWidth: parseFloat(e.target.value) || 0.6 })} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Profundidad (m)</Label>
-                <Input type="number" step="0.1" value={state.trayDepth} onChange={(e) => updateState({ trayDepth: parseFloat(e.target.value) || 0.4 })} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Carga Máx (kg)</Label>
-                <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: parseFloat(e.target.value) || 80 })} className="h-9" />
-              </div>
+      {/* Parámetros principales (Clustering y Replicación usan valores por defecto del contexto) */}
+      <Card>
+        <div className="px-5 py-4 border-b">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Settings2 className="w-4 h-4 text-kpi-icon" /> Parámetros de Hardware
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Cantidad de VLMs, bandejas y dimensiones</p>
+        </div>
+        <CardContent className="py-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cantidad VLMs</Label>
+              <Input type="number" value={state.vlmCount} onChange={(e) => updateState({ vlmCount: parseInt(e.target.value) || 4 })} className="h-9" />
             </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="clustering" className="border rounded-lg px-4">
-          <AccordionTrigger className="text-sm font-semibold gap-2 py-3">
-            <span className="flex items-center gap-2"><Cpu className="w-4 h-4 text-kpi-icon" /> Motor de Clustering</span>
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Métrica de Afinidad</Label>
-                <Select value={state.clusteringMethod} onValueChange={(v: "jaccard" | "cosine") => updateState({ clusteringMethod: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="jaccard">Jaccard</SelectItem>
-                    <SelectItem value="cosine">Coseno</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Umbral de Afinidad: {state.affinityThreshold}</Label>
-                <Slider
-                  value={[state.affinityThreshold]}
-                  onValueChange={([v]) => updateState({ affinityThreshold: v })}
-                  min={0} max={1} step={0.05}
-                  className="mt-2"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Top K Vecinos</Label>
-                <Input type="number" value={state.topK} onChange={(e) => updateState({ topK: parseInt(e.target.value) || 30 })} className="h-9" />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bandejas/VLM</Label>
+              <Input type="number" value={state.traysPerVLM} onChange={(e) => updateState({ traysPerVLM: parseInt(e.target.value) || 50 })} className="h-9" />
             </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="strategy" className="border rounded-lg px-4">
-          <AccordionTrigger className="text-sm font-semibold gap-2 py-3">
-            <span className="flex items-center gap-2"><Shuffle className="w-4 h-4 text-kpi-icon" /> Estrategia de Replicación</span>
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex items-center gap-3">
-                <Switch checked={state.includeNoRotation} onCheckedChange={(v) => updateState({ includeNoRotation: v })} />
-                <Label className="text-xs">Incluir SKUs sin rotación</Label>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Factor de Replicación (R)</Label>
-                <Input type="number" min={1} max={state.vlmCount} value={state.replicationFactor} onChange={(e) => updateState({ replicationFactor: parseInt(e.target.value) || 2 })} className="h-9" />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ancho (m)</Label>
+              <Input type="number" step="0.1" value={state.trayWidth} onChange={(e) => updateState({ trayWidth: parseFloat(e.target.value) || 0.6 })} className="h-9" />
             </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Profundidad (m)</Label>
+              <Input type="number" step="0.1" value={state.trayDepth} onChange={(e) => updateState({ trayDepth: parseFloat(e.target.value) || 0.4 })} className="h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Carga Máx (kg)</Label>
+              <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: parseFloat(e.target.value) || 80 })} className="h-9" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {running && (
         <div className="flex items-center justify-center py-16">
@@ -316,7 +286,7 @@ export function Step4MicroSlotting() {
           {/* Tabs per VLM */}
           <Card>
             <Tabs defaultValue="vlm-0">
-              <div className="px-5 py-3 border-b">
+              <div className="px-5 py-3 border-b flex items-center justify-between">
                 <TabsList className="h-9">
                   {(micro.traysPerVLM ?? []).map((_, i) => (
                     <TabsTrigger key={i} value={`vlm-${i}`} className="text-xs px-4">
@@ -325,6 +295,15 @@ export function Step4MicroSlotting() {
                     </TabsTrigger>
                   ))}
                 </TabsList>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => downloadMicroCSV(micro.traysPerVLM ?? [])}
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar a CSV
+                </Button>
               </div>
               {(micro.traysPerVLM ?? []).map((trays, i) => (
                 <TabsContent key={i} value={`vlm-${i}`} className="p-5">
