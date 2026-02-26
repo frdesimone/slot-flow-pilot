@@ -43,8 +43,15 @@ export interface AuditResultsRaw {
 }
 
 export interface MacroResult {
-  storageDistribution: { storage: string; count: number; percentage: number }[];
-  saturation: { zone: string; used: number; capacity: number; percentage: number }[];
+  storageDistribution?: { storage: string; count: number; percentage: number }[];
+  saturation?: { zone: string; used: number; capacity: number; percentage: number }[];
+  /** Nuevo formato: KPIs por tipo de almacenamiento */
+  kpi?: {
+    allocations?: Record<string, { skus_count: number; volume_used: number; volume_target: number; fill_percentage: number }>;
+    unassigned_count?: number;
+  };
+  /** SKUs asignados con storage_type */
+  macro_skus?: Array<Record<string, unknown> & { storage_type?: string }>;
 }
 
 export interface TrayData {
