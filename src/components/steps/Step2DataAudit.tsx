@@ -87,9 +87,9 @@ export function Step2DataAudit() {
       try {
         const raw = await response.json();
         data = {
-          heavy_skus: typeof raw?.heavy_skus === "number" ? raw.heavy_skus : 0,
-          bulky_skus: typeof raw?.bulky_skus === "number" ? raw.bulky_skus : 0,
-          massive_orders: typeof raw?.massive_orders === "number" ? raw.massive_orders : 0,
+          heavy_skus: Array.isArray(raw?.heavy_skus) ? raw.heavy_skus.length : 0,
+          bulky_skus: Array.isArray(raw?.bulky_skus) ? raw.bulky_skus.length : 0,
+          massive_orders: Array.isArray(raw?.massive_orders) ? raw.massive_orders.length : 0,
           ubiquitous_skus: Array.isArray(raw?.ubiquitous_skus) ? raw.ubiquitous_skus : [],
         };
       } catch (parseError) {
