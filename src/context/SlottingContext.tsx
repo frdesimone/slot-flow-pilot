@@ -34,6 +34,14 @@ export interface AuditResult {
   omnipresentSKUs: { id: string; description: string; appearances: number; percentage: number }[];
 }
 
+/** Respuesta cruda de la API de outliers (arrays de objetos) */
+export interface AuditResultsRaw {
+  heavy_skus?: unknown[];
+  bulky_skus?: unknown[];
+  massive_orders?: unknown[];
+  ubiquitous_skus?: { id: string; description: string; appearances: number; percentage: number }[];
+}
+
 export interface MacroResult {
   storageDistribution: { storage: string; count: number; percentage: number }[];
   saturation: { zone: string; used: number; capacity: number; percentage: number }[];
@@ -83,6 +91,7 @@ export interface SlottingState {
   // Step 2
   auditRun: boolean;
   auditResult: AuditResult | null;
+  auditResults: AuditResultsRaw | null;
   excludeOutliers: boolean;
   // Step 3
   coverageDays: number;
@@ -109,6 +118,7 @@ interface SlottingContextType {
   updateState: (partial: Partial<SlottingState>) => void;
   setDataFile: (file: File | null) => void;
   setMappingConfig: (partial: Partial<MappingConfig>) => void;
+  setAuditResults: (results: AuditResultsRaw | null) => void;
 }
 
 const defaultStorageTypes: StorageType[] = [
@@ -142,6 +152,7 @@ const initialState: SlottingState = {
   mappingConfig: defaultMappingConfig,
   auditRun: false,
   auditResult: null,
+  auditResults: null,
   excludeOutliers: true,
   coverageDays: 15,
   storageTypes: defaultStorageTypes,
@@ -195,9 +206,13 @@ export function SlottingProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const setAuditResults = useCallback((results: AuditResultsRaw | null) => {
+    setState((prev) => ({ ...prev, auditResults: results }));
+  }, []);
+
   return (
     <SlottingContext.Provider
-      value={{ state, setStep, completeStep, updateState, setDataFile, setMappingConfig }}
+      value={{ state, setStep, completeStep, updateState, setDataFile, setMappingConfig, setAuditResults }}
     >
       {children}
     </SlottingContext.Provider>
