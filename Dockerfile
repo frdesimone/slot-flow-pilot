@@ -1,17 +1,14 @@
-# Usamos una imagen oficial de Node.js (inmune a Heroku)
-FROM node:20-alpine
-
-# Seteamos la carpeta de trabajo
+FROM node:20-alpine as build
 WORKDIR /app
-
-# Copiamos los archivos de dependencias
-COPY package.json package-lock.json* ./
-
-# Instalamos las librerías
+COPY package*.json ./
 RUN npm install
-
-# Copiamos el resto del código
 COPY . .
-
-# Compilamos React/Vite
 RUN npm run build
+
+# Para un Web Service, necesitamos un servidor que entregue los archivos
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=build /app/dist ./dist
+EXPOSE 8080
+CMD ["serve", "-s", "dist", "-l", "8080"]
