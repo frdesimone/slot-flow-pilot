@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import type { AuditResultsRaw } from "@/context/SlottingContext";
+import type { AuditResultsRaw, OutlierSkuItem, OutlierOrderItem, OutlierUbiquitousItem } from "@/context/SlottingContext";
 import { ArrowRight, ArrowLeft, Zap, Weight, Box, ShoppingCart, Star, Download, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,27 @@ const DEFAULT_OUTLIERS_CONFIG: OutliersConfig = {
   massive: { enabled: true, lines_threshold: 50 },
   ubiquitous: { enabled: true, frequency_threshold: 0.15 },
 };
+
+/** Formatea un outlier para mostrar: "[ID] - [Descripción] (Valor)" */
+function formatOutlierDisplay(
+  item: OutlierSkuItem | OutlierOrderItem | OutlierUbiquitousItem | Record<string, unknown>,
+  category: string
+): string {
+  const id = (item?.sku_id ?? item?.order_id ?? (item as Record<string, unknown>)?.id ?? "") as string;
+  const desc = ((item as Record<string, unknown>)?.description ?? "") as string;
+  const val = (item as Record<string, unknown>)?.value;
+  let valStr = "";
+  if (typeof val === "number") {
+    if (category === "ubiquitous_skus") valStr = `${(val * 100).toFixed(2)}%`;
+    else if (category === "heavy_skus") valStr = `${val} kg`;
+    else if (category === "bulky_skus") valStr = `${val} m³`;
+    else valStr = String(val);
+  } else {
+    valStr = String(val ?? "");
+  }
+  const descPart = desc ? ` - ${desc}` : "";
+  return `${id}${descPart} (${valStr})`;
+}
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
   heavy_skus: { label: "SKUs >25kg", icon: Weight },
@@ -453,10 +474,12 @@ export function Step2DataAudit() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="font-semibold">Detalle</TableHead>
                         {(() => {
                           const data = getCategoryData(selectedCategory).slice(0, 50) as Record<string, unknown>[];
-                          const headers = [...new Set(data.flatMap((item) => Object.keys(item)))];
-                          return headers.map((h) => (
+                          const allKeys = [...new Set(data.flatMap((item) => Object.keys(item ?? {})))];
+                          const extra = allKeys.filter((h) => !["sku_id", "order_id", "id", "description"].includes(h));
+                          return extra.map((h) => (
                             <TableHead key={h} className="capitalize">
                               {h.replace(/_/g, " ")}
                             </TableHead>
@@ -465,18 +488,23 @@ export function Step2DataAudit() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(getCategoryData(selectedCategory).slice(0, 50) as Record<string, unknown>[]).map((item, idx) => {
-                        const headers = [...new Set(Object.keys(item))];
-                        return (
-                          <TableRow key={idx}>
-                            {headers.map((h) => (
+                      {(getCategoryData(selectedCategory).slice(0, 50) as Record<string, unknown>[]).map((item, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="text-sm font-medium">
+                            {formatOutlierDisplay(item ?? {}, selectedCategory)}
+                          </TableCell>
+                          {(() => {
+                            const headers = [...new Set(Object.keys(item ?? {}))].filter(
+                              (h) => !["sku_id", "order_id", "id", "description"].includes(h)
+                            );
+                            return headers.map((h) => (
                               <TableCell key={h} className="text-sm">
-                                {typeof item[h] === "number" ? (item[h] as number).toLocaleString() : String(item[h] ?? "")}
+                                {typeof item?.[h] === "number" ? (item[h] as number).toLocaleString() : String(item?.[h] ?? "")}
                               </TableCell>
-                            ))}
-                          </TableRow>
-                        );
-                      })}
+                            ));
+                          })()}
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 )}

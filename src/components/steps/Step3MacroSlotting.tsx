@@ -39,9 +39,24 @@ const DEFAULT_STORAGE: MacroStorageType = {
   max_weight: 25,
   capacity: 60,
   occupancy: 0.85,
-  max_cycle_volume_limit: 100,
+  max_cycle_volume_limit: 999,
   allowed_categories: "",
 };
+
+function ensureStorageType(st: Partial<MacroStorageType> | undefined): MacroStorageType {
+  if (!st || typeof st !== "object") return { ...DEFAULT_STORAGE };
+  return {
+    name: String(st.name ?? DEFAULT_STORAGE.name),
+    priority: st.priority ?? DEFAULT_STORAGE.priority,
+    cycle_days: st.cycle_days ?? DEFAULT_STORAGE.cycle_days,
+    max_volume: st.max_volume ?? DEFAULT_STORAGE.max_volume,
+    max_weight: st.max_weight ?? DEFAULT_STORAGE.max_weight,
+    capacity: st.capacity ?? DEFAULT_STORAGE.capacity,
+    occupancy: st.occupancy ?? DEFAULT_STORAGE.occupancy,
+    max_cycle_volume_limit: st.max_cycle_volume_limit ?? DEFAULT_STORAGE.max_cycle_volume_limit,
+    allowed_categories: typeof st.allowed_categories === "string" ? st.allowed_categories : "",
+  };
+}
 
 function extractId(obj: Record<string, unknown>): string | null {
   const keys = ["id", "sku_id", "material", "codigo"];
@@ -53,15 +68,16 @@ function extractId(obj: Record<string, unknown>): string | null {
   return null;
 }
 
-function downloadMacroCSV(rows: MacroSkuRow[]) {
+function downloadMacroCSV(rows: MacroSkuRow[] | undefined | null) {
+  const safeRows = rows ?? [];
   const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Categoría"];
-  const csvRows = rows.map((r) => [
-    r.sku_id,
-    r.description,
-    r.storage_type,
-    r.vol_cycle.toFixed(4),
-    (r.vol_cycle * (r.boxes_per_m3 || 0)).toFixed(2),
-    r.category,
+  const csvRows = safeRows.map((r) => [
+    r?.sku_id ?? "",
+    r?.description ?? "",
+    r?.storage_type ?? "",
+    (Number(r?.vol_cycle) || 0).toFixed(4),
+    ((Number(r?.vol_cycle) || 0) * (Number(r?.boxes_per_m3) || 0)).toFixed(2),
+    r?.category ?? "",
   ]);
   const csv = [headers.join(","), ...csvRows.map((r) => r.map((c) => (String(c).includes(",") || String(c).includes('"') ? `"${String(c).replace(/"/g, '""')}"` : c)).join(","))].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
@@ -88,13 +104,13 @@ export function Step3MacroSlotting() {
   const [running, setRunning] = useState(false);
   const { toast } = useToast();
 
-  const [storageTypes, setStorageTypes] = useState<MacroStorageType[]>([{ ...DEFAULT_STORAGE }]);
+  const [storageTypes, setStorageTypes] = useState<MacroStorageType[]>(() => [ensureStorageType({ ...DEFAULT_STORAGE })]);
 
-  const auditResults = state.auditResults;
-  const excludeOutliers = state.excludeOutliers;
+  const auditResults = state?.auditResults;
+  const excludeOutliers = state?.excludeOutliers ?? false;
 
   const handleRun = async () => {
-    if (!state.dataFile) {
+    if (!state?.dataFile) {
       toast({
         title: "Archivo pendiente",
         description: "Por favor vuelve al Paso 1 y carga el dataset Excel antes de continuar.",
@@ -107,7 +123,7 @@ export function Step3MacroSlotting() {
       setRunning(true);
 
       const formData = new FormData();
-      formData.append("file", state.dataFile);
+      formData.append("file", state!.dataFile);
 
       // Exclusiones de auditoría
       formData.append("exclude_outliers", excludeOutliers ? "true" : "false");
@@ -133,20 +149,23 @@ export function Step3MacroSlotting() {
       formData.append("excluded_orders", JSON.stringify(excluded_orders));
 
       // Tipos de almacenamiento dinámicos (fallback seguro para strings vacíos)
-      const safeStorageTypes = storageTypes.map((st) => ({
-        name: st.name,
-        priority: Number(st.priority) || 1,
-        cycle_days: Number(st.cycle_days) || 15,
-        max_volume: Number(st.max_volume) || 0.1,
-        max_weight: Number(st.max_weight) || 25,
-        capacity: Number(st.capacity) || 60,
-        occupancy: Number(st.occupancy) || 0.85,
-        max_cycle_volume_limit: Number(st.max_cycle_volume_limit) || 100,
-        allowed_categories: st.allowed_categories,
-      }));
+      const safeStorageTypes = (storageTypes ?? []).map((st) => {
+        const safe = ensureStorageType(st);
+        return {
+          name: safe.name,
+          priority: Number(safe.priority) || 1,
+          cycle_days: Number(safe.cycle_days) || 15,
+          max_volume: Number(safe.max_volume) || 0.1,
+          max_weight: Number(safe.max_weight) || 25,
+          capacity: Number(safe.capacity) || 60,
+          occupancy: Number(safe.occupancy) || 0.85,
+          max_cycle_volume_limit: Number(safe.max_cycle_volume_limit) || 999,
+          allowed_categories: safe.allowed_categories ?? "",
+        };
+      });
       formData.append("storage_types", JSON.stringify(safeStorageTypes));
 
-      Object.entries(state.mappingConfig).forEach(([key, value]) => {
+      Object.entries(state?.mappingConfig ?? {}).forEach(([key, value]) => {
         formData.append(key, value);
       });
 
@@ -193,60 +212,62 @@ export function Step3MacroSlotting() {
   const addStorageType = () => {
     setStorageTypes((prev) => [
       ...prev,
-      {
+      ensureStorageType({
         ...DEFAULT_STORAGE,
-        name: `Storage ${prev.length + 1}`,
-        priority: prev.length + 1,
-      },
+        name: `Storage ${(prev?.length ?? 0) + 1}`,
+        priority: (prev?.length ?? 0) + 1,
+      }),
     ]);
   };
 
   const updateStorageType = (idx: number, field: keyof MacroStorageType, value: string | number) => {
     setStorageTypes((prev) => {
-      const next = [...prev];
+      const list = prev ?? [];
+      const next = [...list];
+      const current = ensureStorageType(next[idx]);
       const parsed = (field === "allowed_categories" || field === "name")
-        ? String(value)
+        ? String(value ?? "")
         : (value === "" ? "" : (field === "cycle_days" || field === "priority" || field === "max_weight")
           ? (typeof value === "number" ? value : parseInt(String(value), 10) || 0)
           : (typeof value === "number" ? value : parseFloat(String(value)) || 0));
-      next[idx] = { ...next[idx], [field]: parsed };
+      next[idx] = { ...current, [field]: parsed };
       return next;
     });
   };
 
   const removeStorageType = (idx: number) => {
-    setStorageTypes((prev) => prev.filter((_, i) => i !== idx));
+    setStorageTypes((prev) => (prev ?? []).filter((_, i) => i !== idx));
   };
 
-  const macro = state.macroResult;
+  const macro = state?.macroResult ?? null;
   const kpi = macro?.kpi;
   const allocations = kpi?.allocations ?? {};
   const unassignedCount = kpi?.unassigned_count ?? 0;
-  const macroSkusRaw = macro?.macro_skus ?? [];
-
-  const storageTypeOptions = useMemo(() => {
-    const base = [...storageTypes.map((s) => s.name), "UNASSIGNED"];
-    const fromRows = [...new Set(tableRows.map((r) => r.storage_type).filter(Boolean))];
-    return [...new Set([...base, ...fromRows])];
-  }, [storageTypes, tableRows]);
-
-  const rawToRows = (raw: Array<Record<string, unknown>>): MacroSkuRow[] =>
-    raw.map((r) => ({
-      sku_id: String(r.sku_id ?? r.id ?? r.material ?? r.codigo ?? ""),
-      description: String(r.description ?? ""),
-      storage_type: String(r.storage_type ?? ""),
-      vol_cycle: Number(r.vol_cycle ?? r.cycle_volume ?? 0),
-      boxes_per_m3: Number(r.boxes_per_m3 ?? 0),
-      category: String(r.category ?? ""),
-    }));
 
   const [tableRows, setTableRows] = useState<MacroSkuRow[]>([]);
   type SortKey = keyof MacroSkuRow | "cajas_ciclo";
   const [sortConfig, setSortConfig] = useState<{ column: SortKey; direction: "asc" | "desc" } | null>(null);
 
+  const storageTypeOptions = useMemo(() => {
+    const base = [...(storageTypes ?? []).map((s) => s?.name).filter(Boolean), "UNASSIGNED"];
+    const fromRows = [...new Set((tableRows ?? []).map((r) => r?.storage_type).filter(Boolean))];
+    return [...new Set([...base, ...fromRows])];
+  }, [storageTypes, tableRows]);
+
+  const rawToRows = (raw: Array<Record<string, unknown>> | undefined | null): MacroSkuRow[] =>
+    (raw ?? []).map((r) => ({
+      sku_id: String(r?.sku_id ?? r?.id ?? r?.material ?? r?.codigo ?? ""),
+      description: String(r?.description ?? ""),
+      storage_type: String(r?.storage_type ?? ""),
+      vol_cycle: Number(r?.vol_cycle ?? r?.cycle_volume ?? 0) || 0,
+      boxes_per_m3: Number(r?.boxes_per_m3 ?? 0) || 0,
+      category: String(r?.category ?? ""),
+    }));
+
   useEffect(() => {
-    if (macro?.macro_skus?.length) {
-      setTableRows(rawToRows(macro.macro_skus as Array<Record<string, unknown>>));
+    const raw = macro?.macro_skus;
+    if (Array.isArray(raw) && raw.length > 0) {
+      setTableRows(rawToRows(raw as Array<Record<string, unknown>>));
     } else {
       setTableRows([]);
     }
@@ -266,8 +287,9 @@ export function Step3MacroSlotting() {
   };
 
   const sortedRows = useMemo(() => {
-    if (!sortConfig) return tableRows;
-    return [...tableRows].sort((a, b) => {
+    const rows = tableRows ?? [];
+    if (!sortConfig) return rows;
+    return [...rows].sort((a, b) => {
       const aVal = sortConfig.column === "cajas_ciclo"
         ? a.vol_cycle * (a.boxes_per_m3 || 0)
         : a[sortConfig.column as keyof MacroSkuRow];
@@ -330,20 +352,22 @@ export function Step3MacroSlotting() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {storageTypes.map((st, idx) => (
+                {(storageTypes ?? []).map((st, idx) => {
+                  const safe = ensureStorageType(st);
+                  return (
                   <TableRow key={idx}>
                     <TableCell>
                       <Input
                         type="number"
                         min={1}
-                        value={st.priority}
+                        value={safe.priority}
                         onChange={(e) => updateStorageType(idx, "priority", e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 1))}
                         className="h-8 w-16 text-xs"
                       />
                     </TableCell>
                     <TableCell>
                       <Input
-                        value={st.name}
+                        value={safe.name}
                         onChange={(e) => updateStorageType(idx, "name", e.target.value)}
                         className="h-8 text-xs"
                       />
@@ -352,7 +376,7 @@ export function Step3MacroSlotting() {
                       <Input
                         type="number"
                         min={1}
-                        value={st.cycle_days}
+                        value={safe.cycle_days}
                         onChange={(e) => updateStorageType(idx, "cycle_days", e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15))}
                         className="h-8 w-20 text-xs"
                       />
@@ -361,7 +385,7 @@ export function Step3MacroSlotting() {
                       <Input
                         type="number"
                         step={0.01}
-                        value={st.max_volume}
+                        value={safe.max_volume}
                         onChange={(e) => updateStorageType(idx, "max_volume", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
@@ -369,7 +393,7 @@ export function Step3MacroSlotting() {
                     <TableCell>
                       <Input
                         type="number"
-                        value={st.max_weight}
+                        value={safe.max_weight}
                         onChange={(e) => updateStorageType(idx, "max_weight", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
@@ -377,7 +401,7 @@ export function Step3MacroSlotting() {
                     <TableCell>
                       <Input
                         type="number"
-                        value={st.capacity}
+                        value={safe.capacity}
                         onChange={(e) => updateStorageType(idx, "capacity", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
@@ -388,7 +412,7 @@ export function Step3MacroSlotting() {
                         min={0.01}
                         max={1}
                         step={0.01}
-                        value={st.occupancy}
+                        value={safe.occupancy}
                         onChange={(e) => updateStorageType(idx, "occupancy", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.85))}
                         className="h-8 text-xs"
                       />
@@ -397,7 +421,7 @@ export function Step3MacroSlotting() {
                       <Input
                         type="number"
                         step={0.01}
-                        value={st.max_cycle_volume_limit}
+                        value={safe.max_cycle_volume_limit}
                         onChange={(e) => updateStorageType(idx, "max_cycle_volume_limit", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
@@ -405,7 +429,7 @@ export function Step3MacroSlotting() {
                     <TableCell>
                       <Input
                         placeholder="A, B, C (comas)"
-                        value={st.allowed_categories}
+                        value={safe.allowed_categories ?? ""}
                         onChange={(e) => updateStorageType(idx, "allowed_categories", e.target.value)}
                         className="h-8 text-xs"
                       />
@@ -416,13 +440,14 @@ export function Step3MacroSlotting() {
                         variant="ghost"
                         className="h-7 w-7"
                         onClick={() => removeStorageType(idx)}
-                        disabled={storageTypes.length <= 1}
+                        disabled={(storageTypes ?? []).length <= 1}
                       >
                         <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -552,38 +577,43 @@ export function Step3MacroSlotting() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedRows.map((row) => (
-                      <TableRow key={row.sku_id}>
-                        <TableCell className="font-mono text-sm">{row.sku_id}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate" title={row.description}>
-                          {row.description || "—"}
+                    {(sortedRows ?? []).map((row, rowIdx) => {
+                      const skuId = row?.sku_id ?? `row-${rowIdx}`;
+                      const volCycle = Number(row?.vol_cycle) || 0;
+                      const boxesPerM3 = Number(row?.boxes_per_m3) || 0;
+                      return (
+                      <TableRow key={skuId}>
+                        <TableCell className="font-mono text-sm">{row?.sku_id ?? "—"}</TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate" title={row?.description ?? ""}>
+                          {row?.description || "—"}
                         </TableCell>
                         <TableCell>
                           <Select
-                            value={row.storage_type}
-                            onValueChange={(v) => updateTableStorageType(row.sku_id, v)}
+                            value={row?.storage_type ?? ""}
+                            onValueChange={(v) => updateTableStorageType(skuId, v)}
                           >
                             <SelectTrigger className="h-8 text-xs min-w-[100px]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {storageTypeOptions.map((opt) => (
-                                <SelectItem key={opt} value={opt} className="text-xs">
-                                  {opt}
+                              {(storageTypeOptions ?? []).map((opt, optIdx) => (
+                                <SelectItem key={opt ?? `opt-${optIdx}`} value={opt ?? ""} className="text-xs">
+                                  {opt ?? ""}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell className="text-sm tabular-nums">
-                          {row.vol_cycle.toFixed(4)}
+                          {volCycle.toFixed(4)}
                         </TableCell>
                         <TableCell className="text-sm tabular-nums">
-                          {(row.vol_cycle * (row.boxes_per_m3 || 0)).toFixed(2)}
+                          {(volCycle * boxesPerM3).toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-sm">{row.category || "—"}</TableCell>
+                        <TableCell className="text-sm">{row?.category || "—"}</TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

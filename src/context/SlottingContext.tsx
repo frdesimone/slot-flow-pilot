@@ -34,12 +34,34 @@ export interface AuditResult {
   omnipresentSKUs: { id: string; description: string; appearances: number; percentage: number }[];
 }
 
-/** Respuesta cruda de la API de outliers (arrays de objetos) */
+/** Objeto SKU outlier: sku_id, description y valor de la anomalía */
+export interface OutlierSkuItem {
+  sku_id: string;
+  description?: string;
+  value: number;
+}
+
+/** Objeto pedido outlier: order_id, description y valor (líneas) */
+export interface OutlierOrderItem {
+  order_id: string;
+  description?: string;
+  value: number;
+}
+
+/** Objeto SKU omnipresente: sku_id, description, value (frecuencia), count */
+export interface OutlierUbiquitousItem {
+  sku_id: string;
+  description?: string;
+  value: number;
+  count?: number;
+}
+
+/** Respuesta cruda de la API de outliers (arrays de objetos enriquecidos) */
 export interface AuditResultsRaw {
-  heavy_skus?: unknown[];
-  bulky_skus?: unknown[];
-  massive_orders?: unknown[];
-  ubiquitous_skus?: { id: string; description: string; appearances: number; percentage: number }[];
+  heavy_skus?: OutlierSkuItem[];
+  bulky_skus?: OutlierSkuItem[];
+  massive_orders?: OutlierOrderItem[];
+  ubiquitous_skus?: OutlierUbiquitousItem[];
 }
 
 export interface MacroResult {
