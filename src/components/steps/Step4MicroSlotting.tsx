@@ -188,10 +188,10 @@ export function Step4MicroSlotting() {
       const formData = new FormData();
       formData.append("file", state.dataFile);
 
-      // Parámetros propios de Micro-Slotting
-      formData.append("cycle_days", String(state.coverageDays));
-      formData.append("n_vlms", String(state.vlmCount));
-      formData.append("n_trays_per_vlm", String(state.traysPerVLM));
+      // Parámetros propios de Micro-Slotting (fallback seguro para strings vacíos)
+      formData.append("cycle_days", String(Number(state.coverageDays) || 15));
+      formData.append("n_vlms", String(Number(state.vlmCount) || 4));
+      formData.append("n_trays_per_vlm", String(Number(state.traysPerVLM) || 50));
       formData.append("include_zero_rot", String(state.includeNoRotation));
       formData.append("optimize_trays", "true");
       formData.append("opt_time_ms", "2000");
@@ -311,27 +311,27 @@ export function Step4MicroSlotting() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Días de Cobertura (cycle days)</Label>
-              <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: parseInt(e.target.value) || 15 })} className="h-9" />
+              <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15) })} className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Cantidad VLMs</Label>
-              <Input type="number" value={state.vlmCount} onChange={(e) => updateState({ vlmCount: parseInt(e.target.value) || 4 })} className="h-9" />
+              <Input type="number" value={state.vlmCount} onChange={(e) => updateState({ vlmCount: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 4) })} className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Bandejas/VLM</Label>
-              <Input type="number" value={state.traysPerVLM} onChange={(e) => updateState({ traysPerVLM: parseInt(e.target.value) || 50 })} className="h-9" />
+              <Input type="number" value={state.traysPerVLM} onChange={(e) => updateState({ traysPerVLM: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 50) })} className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Ancho (m)</Label>
-              <Input type="number" step="0.1" value={state.trayWidth} onChange={(e) => updateState({ trayWidth: parseFloat(e.target.value) || 0.6 })} className="h-9" />
+              <Input type="number" step="0.1" value={state.trayWidth} onChange={(e) => updateState({ trayWidth: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.6) })} className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Profundidad (m)</Label>
-              <Input type="number" step="0.1" value={state.trayDepth} onChange={(e) => updateState({ trayDepth: parseFloat(e.target.value) || 0.4 })} className="h-9" />
+              <Input type="number" step="0.1" value={state.trayDepth} onChange={(e) => updateState({ trayDepth: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.4) })} className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Carga Máx (kg)</Label>
-              <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: parseFloat(e.target.value) || 80 })} className="h-9" />
+              <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: e.target.value === "" ? "" : (parseFloat(e.target.value) || 80) })} className="h-9" />
             </div>
           </div>
         </CardContent>

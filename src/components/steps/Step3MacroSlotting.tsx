@@ -12,13 +12,13 @@ import { useToast } from "@/components/ui/use-toast";
 
 type MacroStorageType = {
   name: string;
-  priority: number;
-  cycle_days: number;
-  max_volume: number;
-  max_weight: number;
-  capacity: number;
-  occupancy: number;
-  max_cycle_volume_limit: number;
+  priority: number | string;
+  cycle_days: number | string;
+  max_volume: number | string;
+  max_weight: number | string;
+  capacity: number | string;
+  occupancy: number | string;
+  max_cycle_volume_limit: number | string;
   allowed_categories: string;
 };
 
@@ -132,8 +132,19 @@ export function Step3MacroSlotting() {
       formData.append("excluded_skus", JSON.stringify(excluded_skus));
       formData.append("excluded_orders", JSON.stringify(excluded_orders));
 
-      // Tipos de almacenamiento dinámicos
-      formData.append("storage_types", JSON.stringify(storageTypes));
+      // Tipos de almacenamiento dinámicos (fallback seguro para strings vacíos)
+      const safeStorageTypes = storageTypes.map((st) => ({
+        name: st.name,
+        priority: Number(st.priority) || 1,
+        cycle_days: Number(st.cycle_days) || 15,
+        max_volume: Number(st.max_volume) || 0.1,
+        max_weight: Number(st.max_weight) || 25,
+        capacity: Number(st.capacity) || 60,
+        occupancy: Number(st.occupancy) || 0.85,
+        max_cycle_volume_limit: Number(st.max_cycle_volume_limit) || 100,
+        allowed_categories: st.allowed_categories,
+      }));
+      formData.append("storage_types", JSON.stringify(safeStorageTypes));
 
       Object.entries(state.mappingConfig).forEach(([key, value]) => {
         formData.append(key, value);
@@ -195,9 +206,9 @@ export function Step3MacroSlotting() {
       const next = [...prev];
       const parsed = (field === "allowed_categories" || field === "name")
         ? String(value)
-        : (field === "cycle_days" || field === "priority" || field === "max_weight")
+        : (value === "" ? "" : (field === "cycle_days" || field === "priority" || field === "max_weight")
           ? (typeof value === "number" ? value : parseInt(String(value), 10) || 0)
-          : (typeof value === "number" ? value : parseFloat(String(value)) || 0);
+          : (typeof value === "number" ? value : parseFloat(String(value)) || 0));
       next[idx] = { ...next[idx], [field]: parsed };
       return next;
     });
@@ -326,7 +337,7 @@ export function Step3MacroSlotting() {
                         type="number"
                         min={1}
                         value={st.priority}
-                        onChange={(e) => updateStorageType(idx, "priority", parseInt(e.target.value) || 1)}
+                        onChange={(e) => updateStorageType(idx, "priority", e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 1))}
                         className="h-8 w-16 text-xs"
                       />
                     </TableCell>
@@ -342,7 +353,7 @@ export function Step3MacroSlotting() {
                         type="number"
                         min={1}
                         value={st.cycle_days}
-                        onChange={(e) => updateStorageType(idx, "cycle_days", parseInt(e.target.value) || 15)}
+                        onChange={(e) => updateStorageType(idx, "cycle_days", e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15))}
                         className="h-8 w-20 text-xs"
                       />
                     </TableCell>
@@ -351,7 +362,7 @@ export function Step3MacroSlotting() {
                         type="number"
                         step={0.01}
                         value={st.max_volume}
-                        onChange={(e) => updateStorageType(idx, "max_volume", parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateStorageType(idx, "max_volume", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
                     </TableCell>
@@ -359,7 +370,7 @@ export function Step3MacroSlotting() {
                       <Input
                         type="number"
                         value={st.max_weight}
-                        onChange={(e) => updateStorageType(idx, "max_weight", parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateStorageType(idx, "max_weight", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
                     </TableCell>
@@ -367,7 +378,7 @@ export function Step3MacroSlotting() {
                       <Input
                         type="number"
                         value={st.capacity}
-                        onChange={(e) => updateStorageType(idx, "capacity", parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateStorageType(idx, "capacity", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
                     </TableCell>
@@ -378,7 +389,7 @@ export function Step3MacroSlotting() {
                         max={1}
                         step={0.01}
                         value={st.occupancy}
-                        onChange={(e) => updateStorageType(idx, "occupancy", parseFloat(e.target.value) || 0.85)}
+                        onChange={(e) => updateStorageType(idx, "occupancy", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.85))}
                         className="h-8 text-xs"
                       />
                     </TableCell>
@@ -387,7 +398,7 @@ export function Step3MacroSlotting() {
                         type="number"
                         step={0.01}
                         value={st.max_cycle_volume_limit}
-                        onChange={(e) => updateStorageType(idx, "max_cycle_volume_limit", parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateStorageType(idx, "max_cycle_volume_limit", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                         className="h-8 text-xs"
                       />
                     </TableCell>

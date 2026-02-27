@@ -104,15 +104,15 @@ export interface SlottingState {
   auditResults: AuditResultsRaw | null;
   excludeOutliers: boolean;
   // Step 3
-  coverageDays: number;
+  coverageDays: number | string;
   storageTypes: StorageType[];
   macroResult: MacroResult | null;
   // Step 4
-  vlmCount: number;
-  traysPerVLM: number;
-  trayWidth: number;
-  trayDepth: number;
-  trayMaxWeight: number;
+  vlmCount: number | string;
+  traysPerVLM: number | string;
+  trayWidth: number | string;
+  trayDepth: number | string;
+  trayMaxWeight: number | string;
   clusteringMethod: "jaccard" | "cosine";
   affinityThreshold: number;
   topK: number;

@@ -12,15 +12,15 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/components/ui/use-toast";
 
 export interface OutliersConfig {
-  heavy: { enabled: boolean; weight_min: number; weight_max: number };
-  bulky: { enabled: boolean; volume_min: number; volume_max: number };
-  massive: { enabled: boolean; lines_threshold: number };
-  ubiquitous: { enabled: boolean; frequency_threshold: number };
+  heavy: { enabled: boolean; weight_min: number | string; weight_max: number | string };
+  bulky: { enabled: boolean; volume_min: number | string; volume_max: number | string };
+  massive: { enabled: boolean; lines_threshold: number | string };
+  ubiquitous: { enabled: boolean; frequency_threshold: number | string };
 }
 
 const DEFAULT_OUTLIERS_CONFIG: OutliersConfig = {
-  heavy: { enabled: true, weight_min: 25, weight_max: 1000 },
-  bulky: { enabled: true, volume_min: 0.05, volume_max: 10 },
+  heavy: { enabled: true, weight_min: 0, weight_max: 25 },
+  bulky: { enabled: true, volume_min: 0, volume_max: 0.05 },
   massive: { enabled: true, lines_threshold: 50 },
   ubiquitous: { enabled: true, frequency_threshold: 0.15 },
 };
@@ -132,7 +132,31 @@ export function Step2DataAudit() {
       const formData = new FormData();
       formData.append("file", state.dataFile);
       formData.append("cycle_days", "15.0");
-      formData.append("outliers_config", JSON.stringify(outliersConfig));
+      const safeNum = (v: unknown, def: number) => {
+        const n = Number(v);
+        return Number.isNaN(n) ? def : n;
+      };
+      const safeOutliersConfig = {
+        heavy: {
+          enabled: outliersConfig.heavy.enabled,
+          weight_min: safeNum(outliersConfig.heavy.weight_min, 0),
+          weight_max: safeNum(outliersConfig.heavy.weight_max, 25),
+        },
+        bulky: {
+          enabled: outliersConfig.bulky.enabled,
+          volume_min: safeNum(outliersConfig.bulky.volume_min, 0),
+          volume_max: safeNum(outliersConfig.bulky.volume_max, 0.05),
+        },
+        massive: {
+          enabled: outliersConfig.massive.enabled,
+          lines_threshold: Number(outliersConfig.massive.lines_threshold) || 50,
+        },
+        ubiquitous: {
+          enabled: outliersConfig.ubiquitous.enabled,
+          frequency_threshold: Number(outliersConfig.ubiquitous.frequency_threshold) || 0.15,
+        },
+      };
+      formData.append("outliers_config", JSON.stringify(safeOutliersConfig));
 
       Object.entries(state.mappingConfig).forEach(([key, value]) => {
         formData.append(key, value);
@@ -216,37 +240,38 @@ export function Step2DataAudit() {
           <CollapsibleContent>
             <CardContent className="pt-0 pb-5 px-5">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Heavy SKUs */}
+                {/* Heavy SKUs - fuera del rango normal = pesado */}
                 <Card className="border">
                   <CardContent className="pt-4 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-semibold flex items-center gap-2">
-                        <Weight className="w-4 h-4" /> SKUs Pesados
+                        <Weight className="w-4 h-4" /> SKUs Pesados (fuera de rango)
                       </Label>
                       <Switch
                         checked={outliersConfig.heavy.enabled}
                         onCheckedChange={(v) => updateOutliersConfig("heavy", { enabled: v })}
                       />
                     </div>
+                    <p className="text-[10px] text-muted-foreground">Rango de Peso Normal (Mínimo - Máximo). Fuera = anómalo.</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-[10px]">Min Peso (kg)</Label>
+                        <Label className="text-[10px]">Mín. Normal (kg)</Label>
                         <Input
                           type="number"
                           step="0.1"
                           value={outliersConfig.heavy.weight_min}
-                          onChange={(e) => updateOutliersConfig("heavy", { weight_min: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateOutliersConfig("heavy", { weight_min: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                           className="h-8 text-xs"
                           disabled={!outliersConfig.heavy.enabled}
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px]">Max Peso (kg)</Label>
+                        <Label className="text-[10px]">Máx. Normal (kg)</Label>
                         <Input
                           type="number"
                           step="0.1"
                           value={outliersConfig.heavy.weight_max}
-                          onChange={(e) => updateOutliersConfig("heavy", { weight_max: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateOutliersConfig("heavy", { weight_max: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                           className="h-8 text-xs"
                           disabled={!outliersConfig.heavy.enabled}
                         />
@@ -255,37 +280,38 @@ export function Step2DataAudit() {
                   </CardContent>
                 </Card>
 
-                {/* Bulky SKUs */}
+                {/* Bulky SKUs - fuera del rango normal = voluminoso */}
                 <Card className="border">
                   <CardContent className="pt-4 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-semibold flex items-center gap-2">
-                        <Box className="w-4 h-4" /> SKUs Voluminosos
+                        <Box className="w-4 h-4" /> SKUs Voluminosos (fuera de rango)
                       </Label>
                       <Switch
                         checked={outliersConfig.bulky.enabled}
                         onCheckedChange={(v) => updateOutliersConfig("bulky", { enabled: v })}
                       />
                     </div>
+                    <p className="text-[10px] text-muted-foreground">Rango de Volumen Normal (Mínimo - Máximo). Fuera = anómalo.</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-[10px]">Min Vol (m³)</Label>
+                        <Label className="text-[10px]">Mín. Normal (m³)</Label>
                         <Input
                           type="number"
                           step="0.001"
                           value={outliersConfig.bulky.volume_min}
-                          onChange={(e) => updateOutliersConfig("bulky", { volume_min: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateOutliersConfig("bulky", { volume_min: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                           className="h-8 text-xs"
                           disabled={!outliersConfig.bulky.enabled}
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px]">Max Vol (m³)</Label>
+                        <Label className="text-[10px]">Máx. Normal (m³)</Label>
                         <Input
                           type="number"
                           step="0.01"
                           value={outliersConfig.bulky.volume_max}
-                          onChange={(e) => updateOutliersConfig("bulky", { volume_max: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateOutliersConfig("bulky", { volume_max: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                           className="h-8 text-xs"
                           disabled={!outliersConfig.bulky.enabled}
                         />
@@ -294,25 +320,26 @@ export function Step2DataAudit() {
                   </CardContent>
                 </Card>
 
-                {/* Massive Orders */}
+                {/* Massive Orders - supera tope normal = B2B */}
                 <Card className="border">
                   <CardContent className="pt-4 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-semibold flex items-center gap-2">
-                        <ShoppingCart className="w-4 h-4" /> Pedidos B2B
+                        <ShoppingCart className="w-4 h-4" /> Pedidos B2B (superan tope)
                       </Label>
                       <Switch
                         checked={outliersConfig.massive.enabled}
                         onCheckedChange={(v) => updateOutliersConfig("massive", { enabled: v })}
                       />
                     </div>
+                    <p className="text-[10px] text-muted-foreground">Tope Normal de Líneas por Pedido. Lo que supere = B2B/Masivo.</p>
                     <div className="space-y-1">
-                      <Label className="text-[10px]">Umbral Líneas B2B</Label>
+                      <Label className="text-[10px]">Tope Normal (líneas)</Label>
                       <Input
                         type="number"
                         min={1}
                         value={outliersConfig.massive.lines_threshold}
-                        onChange={(e) => updateOutliersConfig("massive", { lines_threshold: parseInt(e.target.value) || 1 })}
+                        onChange={(e) => updateOutliersConfig("massive", { lines_threshold: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 1) })}
                         className="h-8 text-xs"
                         disabled={!outliersConfig.massive.enabled}
                       />
@@ -320,27 +347,28 @@ export function Step2DataAudit() {
                   </CardContent>
                 </Card>
 
-                {/* Ubiquitous SKUs */}
+                {/* Ubiquitous SKUs - supera tope normal = omnipresente */}
                 <Card className="border">
                   <CardContent className="pt-4 pb-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-xs font-semibold flex items-center gap-2">
-                        <Star className="w-4 h-4" /> Omnipresentes
+                        <Star className="w-4 h-4" /> Omnipresentes (superan tope)
                       </Label>
                       <Switch
                         checked={outliersConfig.ubiquitous.enabled}
                         onCheckedChange={(v) => updateOutliersConfig("ubiquitous", { enabled: v })}
                       />
                     </div>
+                    <p className="text-[10px] text-muted-foreground">Tope Normal de Aparición de SKU (0-1). Lo que supere = Omnipresente.</p>
                     <div className="space-y-1">
-                      <Label className="text-[10px]">Umbral Frecuencia (0-1)</Label>
+                      <Label className="text-[10px]">Tope Normal (frecuencia)</Label>
                       <Input
                         type="number"
                         step="0.01"
                         min={0}
                         max={1}
                         value={outliersConfig.ubiquitous.frequency_threshold}
-                        onChange={(e) => updateOutliersConfig("ubiquitous", { frequency_threshold: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => updateOutliersConfig("ubiquitous", { frequency_threshold: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                         className="h-8 text-xs"
                         disabled={!outliersConfig.ubiquitous.enabled}
                       />
