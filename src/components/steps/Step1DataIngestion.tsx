@@ -121,7 +121,7 @@ export function Step1DataIngestion() {
   const canProceed = !!state.dataFile;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Carga de Dataset de Slotting</h2>
         <p className="text-sm text-muted-foreground mt-1">
@@ -216,6 +216,32 @@ export function Step1DataIngestion() {
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Columna Descripción SKU (col_desc)</Label>
+                      <Input
+                        value={state.mappingConfig.col_desc}
+                        onChange={(e) => setMappingConfig({ col_desc: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Columna Cajas por M3 (col_cajas_m3)</Label>
+                      <Input
+                        value={state.mappingConfig.col_cajas_m3}
+                        onChange={(e) => setMappingConfig({ col_cajas_m3: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Columna Categoría (col_categoria)</Label>
+                      <Input
+                        value={state.mappingConfig.col_categoria}
+                        onChange={(e) => setMappingConfig({ col_categoria: e.target.value })}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -264,12 +290,17 @@ export function Step1DataIngestion() {
       </Accordion>
 
       {canProceed && (
-        <div className="flex items-center gap-4 pt-2 animate-slide-in">
-          <div className="flex-1 bg-success/10 border border-success/30 rounded-lg px-4 py-3">
+        <div className="animate-slide-in">
+          <div className="bg-success/10 border border-success/30 rounded-lg px-4 py-3">
             <p className="text-sm text-success font-medium">
               Dataset cargado · Listo para auditoría
             </p>
           </div>
+        </div>
+      )}
+
+      {canProceed && (
+        <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t p-4 flex justify-end gap-4 z-50">
           <Button
             onClick={() => { completeStep(0); setStep(1); }}
             className="gap-2"

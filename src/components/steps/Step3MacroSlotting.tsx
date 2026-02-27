@@ -1,30 +1,46 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSlotting, type MacroResult } from "@/context/SlottingContext";
-import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download } from "lucide-react";
+import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 
 type MacroStorageType = {
   name: string;
   priority: number;
+  cycle_days: number;
   max_volume: number;
   max_weight: number;
   capacity: number;
   occupancy: number;
+  max_cycle_volume_limit: number;
+  allowed_categories: string;
+};
+
+type MacroSkuRow = {
+  sku_id: string;
+  description: string;
+  storage_type: string;
+  vol_cycle: number;
+  boxes_per_m3: number;
+  category: string;
 };
 
 const DEFAULT_STORAGE: MacroStorageType = {
   name: "VLM",
   priority: 1,
+  cycle_days: 15,
   max_volume: 0.1,
   max_weight: 25,
   capacity: 60,
   occupancy: 0.85,
+  max_cycle_volume_limit: 100,
+  allowed_categories: "",
 };
 
 function extractId(obj: Record<string, unknown>): string | null {
@@ -37,24 +53,17 @@ function extractId(obj: Record<string, unknown>): string | null {
   return null;
 }
 
-function downloadMacroCSV(macroSkus: Array<Record<string, unknown>>) {
-  const getVal = (row: Record<string, unknown>, ...keys: string[]) => {
-    for (const k of keys) {
-      const v = row[k];
-      if (v != null) return String(v);
-    }
-    return "";
-  };
-  const rows: string[][] = [["SKU ID", "Storage Type", "Volume Cycle", "ABC Class"]];
-  macroSkus.forEach((row) => {
-    rows.push([
-      getVal(row, "id", "sku_id", "material", "codigo"),
-      getVal(row, "storage_type"),
-      getVal(row, "volume_cycle", "cycle_volume"),
-      getVal(row, "abc_class"),
-    ]);
-  });
-  const csv = rows.map((r) => r.map((c) => (c.includes(",") || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+function downloadMacroCSV(rows: MacroSkuRow[]) {
+  const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Categoría"];
+  const csvRows = rows.map((r) => [
+    r.sku_id,
+    r.description,
+    r.storage_type,
+    r.vol_cycle.toFixed(4),
+    (r.vol_cycle * (r.boxes_per_m3 || 0)).toFixed(2),
+    r.category,
+  ]);
+  const csv = [headers.join(","), ...csvRows.map((r) => r.map((c) => (String(c).includes(",") || String(c).includes('"') ? `"${String(c).replace(/"/g, '""')}"` : c)).join(","))].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -99,7 +108,6 @@ export function Step3MacroSlotting() {
 
       const formData = new FormData();
       formData.append("file", state.dataFile);
-      formData.append("cycle_days", String(state.coverageDays));
 
       // Exclusiones de auditoría
       formData.append("exclude_outliers", excludeOutliers ? "true" : "false");
@@ -185,7 +193,12 @@ export function Step3MacroSlotting() {
   const updateStorageType = (idx: number, field: keyof MacroStorageType, value: string | number) => {
     setStorageTypes((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], [field]: typeof value === "string" && field !== "name" ? parseFloat(value) || 0 : value };
+      const parsed = (field === "allowed_categories" || field === "name")
+        ? String(value)
+        : (field === "cycle_days" || field === "priority" || field === "max_weight")
+          ? (typeof value === "number" ? value : parseInt(String(value), 10) || 0)
+          : (typeof value === "number" ? value : parseFloat(String(value)) || 0);
+      next[idx] = { ...next[idx], [field]: parsed };
       return next;
     });
   };
@@ -198,10 +211,72 @@ export function Step3MacroSlotting() {
   const kpi = macro?.kpi;
   const allocations = kpi?.allocations ?? {};
   const unassignedCount = kpi?.unassigned_count ?? 0;
-  const macroSkus = macro?.macro_skus ?? [];
+  const macroSkusRaw = macro?.macro_skus ?? [];
+
+  const storageTypeOptions = useMemo(() => {
+    const base = [...storageTypes.map((s) => s.name), "UNASSIGNED"];
+    const fromRows = [...new Set(tableRows.map((r) => r.storage_type).filter(Boolean))];
+    return [...new Set([...base, ...fromRows])];
+  }, [storageTypes, tableRows]);
+
+  const rawToRows = (raw: Array<Record<string, unknown>>): MacroSkuRow[] =>
+    raw.map((r) => ({
+      sku_id: String(r.sku_id ?? r.id ?? r.material ?? r.codigo ?? ""),
+      description: String(r.description ?? ""),
+      storage_type: String(r.storage_type ?? ""),
+      vol_cycle: Number(r.vol_cycle ?? r.cycle_volume ?? 0),
+      boxes_per_m3: Number(r.boxes_per_m3 ?? 0),
+      category: String(r.category ?? ""),
+    }));
+
+  const [tableRows, setTableRows] = useState<MacroSkuRow[]>([]);
+  type SortKey = keyof MacroSkuRow | "cajas_ciclo";
+  const [sortConfig, setSortConfig] = useState<{ column: SortKey; direction: "asc" | "desc" } | null>(null);
+
+  useEffect(() => {
+    if (macro?.macro_skus?.length) {
+      setTableRows(rawToRows(macro.macro_skus as Array<Record<string, unknown>>));
+    } else {
+      setTableRows([]);
+    }
+  }, [macro]);
+
+  const updateTableStorageType = (skuId: string, newStorageType: string) => {
+    setTableRows((prev) =>
+      prev.map((r) => (r.sku_id === skuId ? { ...r, storage_type: newStorageType } : r))
+    );
+  };
+
+  const handleSort = (column: SortKey) => {
+    setSortConfig((prev) => {
+      const nextDir = prev?.column === column && prev.direction === "asc" ? "desc" : "asc";
+      return { column, direction: nextDir };
+    });
+  };
+
+  const sortedRows = useMemo(() => {
+    if (!sortConfig) return tableRows;
+    return [...tableRows].sort((a, b) => {
+      const aVal = sortConfig.column === "cajas_ciclo"
+        ? a.vol_cycle * (a.boxes_per_m3 || 0)
+        : a[sortConfig.column as keyof MacroSkuRow];
+      const bVal = sortConfig.column === "cajas_ciclo"
+        ? b.vol_cycle * (b.boxes_per_m3 || 0)
+        : b[sortConfig.column as keyof MacroSkuRow];
+      const cmp = typeof aVal === "string" && typeof bVal === "string"
+        ? aVal.localeCompare(bVal)
+        : (Number(aVal) - Number(bVal));
+      return sortConfig.direction === "asc" ? cmp : -cmp;
+    });
+  }, [tableRows, sortConfig]);
+
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortConfig?.column !== col) return <ArrowUpDown className="w-3.5 h-3.5 opacity-50" />;
+    return sortConfig.direction === "asc" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />;
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Macro-Slotting: Perfilado y Asignación</h2>
@@ -218,23 +293,10 @@ export function Step3MacroSlotting() {
       {/* Configuration */}
       <div className="grid grid-cols-1 gap-6">
         <Card>
-          <CardContent className="py-5 px-5 space-y-3">
-            <Label className="text-sm font-medium">Días de Cobertura de Stock</Label>
-            <Input
-              type="number"
-              value={state.coverageDays}
-              onChange={(e) => updateState({ coverageDays: parseInt(e.target.value) || 15 })}
-              className="text-lg font-semibold max-w-[140px]"
-            />
-            <p className="text-[11px] text-muted-foreground">Período de reabastecimiento en días</p>
-          </CardContent>
-        </Card>
-
-        <Card>
           <div className="px-5 py-4 border-b flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
-              <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Ocupación: 0.01 a 1.00</p>
+              <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Cycle Days, Vol. Límite y Categorías por tipo.</p>
             </div>
             <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
               <Plus className="w-3 h-3" /> Añadir
@@ -246,10 +308,13 @@ export function Step3MacroSlotting() {
                 <TableRow>
                   <TableHead className="w-20">Prioridad</TableHead>
                   <TableHead>Nombre</TableHead>
+                  <TableHead className="w-24">Cycle Days</TableHead>
                   <TableHead className="w-24">Vol/SKU (m³)</TableHead>
                   <TableHead className="w-24">Peso/SKU (kg)</TableHead>
                   <TableHead className="w-24">Capacidad (m³)</TableHead>
                   <TableHead className="w-28">Ocupación (0.01-1)</TableHead>
+                  <TableHead className="w-28">Vol. Límite Ciclo</TableHead>
+                  <TableHead className="min-w-[140px]">Categorías Permitidas</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -270,6 +335,15 @@ export function Step3MacroSlotting() {
                         value={st.name}
                         onChange={(e) => updateStorageType(idx, "name", e.target.value)}
                         className="h-8 text-xs"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={st.cycle_days}
+                        onChange={(e) => updateStorageType(idx, "cycle_days", parseInt(e.target.value) || 15)}
+                        className="h-8 w-20 text-xs"
                       />
                     </TableCell>
                     <TableCell>
@@ -305,6 +379,23 @@ export function Step3MacroSlotting() {
                         step={0.01}
                         value={st.occupancy}
                         onChange={(e) => updateStorageType(idx, "occupancy", parseFloat(e.target.value) || 0.85)}
+                        className="h-8 text-xs"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        step={0.01}
+                        value={st.max_cycle_volume_limit}
+                        onChange={(e) => updateStorageType(idx, "max_cycle_volume_limit", parseFloat(e.target.value) || 0)}
+                        className="h-8 text-xs"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="A, B, C (comas)"
+                        value={st.allowed_categories}
+                        onChange={(e) => updateStorageType(idx, "allowed_categories", e.target.value)}
                         className="h-8 text-xs"
                       />
                     </TableCell>
@@ -369,67 +460,122 @@ export function Step3MacroSlotting() {
             )}
           </div>
 
-          {/* Tabla macro_skus */}
-          {macroSkus.length > 0 && (
+          {/* Tabla interactiva macro_skus */}
+          {tableRows.length > 0 && (
             <Card>
               <div className="px-5 py-4 border-b flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold">SKUs Asignados (macro_skus)</h3>
+                  <h3 className="text-sm font-semibold">SKUs Asignados</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Mostrando los primeros 50 resultados (Total: {macroSkus.length})
+                    {tableRows.length} SKUs · Ordenar por columna · Editar Storage Type manualmente
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => downloadMacroCSV(macroSkus)}
+                  onClick={() => downloadMacroCSV(sortedRows)}
                 >
                   <Download className="w-4 h-4" />
                   Exportar a CSV
                 </Button>
               </div>
-              <div className="overflow-auto">
+              <div className="overflow-auto max-h-[500px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {(() => {
-                        const allKeys = [...new Set(macroSkus.flatMap((r) => Object.keys(r)))];
-                        const ordered = allKeys.includes("storage_type")
-                          ? ["storage_type", ...allKeys.filter((k) => k !== "storage_type")]
-                          : allKeys;
-                        return ordered.map((h) => (
-                          <TableHead key={h} className="capitalize">
-                            {h.replace(/_/g, " ")}
-                          </TableHead>
-                        ));
-                      })()}
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("sku_id")}
+                        >
+                          SKU <SortIcon col="sku_id" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("description")}
+                        >
+                          Descripción <SortIcon col="description" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("storage_type")}
+                        >
+                          Storage Type <SortIcon col="storage_type" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("vol_cycle")}
+                        >
+                          Vol. Ciclo <SortIcon col="vol_cycle" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("cajas_ciclo")}
+                        >
+                          Cajas de Ciclo <SortIcon col="cajas_ciclo" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("category")}
+                        >
+                          Categoría <SortIcon col="category" />
+                        </button>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {macroSkus.slice(0, 50).map((row, idx) => {
-                      const allKeys = [...new Set(macroSkus.flatMap((r) => Object.keys(r)))];
-                      const ordered = allKeys.includes("storage_type")
-                        ? ["storage_type", ...allKeys.filter((k) => k !== "storage_type")]
-                        : allKeys;
-                      return (
-                        <TableRow key={idx}>
-                          {ordered.map((h) => (
-                            <TableCell key={h} className="text-sm">
-                              {typeof row[h] === "number" ? (row[h] as number).toLocaleString() : String(row[h] ?? "")}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      );
-                    })}
+                    {sortedRows.map((row) => (
+                      <TableRow key={row.sku_id}>
+                        <TableCell className="font-mono text-sm">{row.sku_id}</TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate" title={row.description}>
+                          {row.description || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={row.storage_type}
+                            onValueChange={(v) => updateTableStorageType(row.sku_id, v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs min-w-[100px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {storageTypeOptions.map((opt) => (
+                                <SelectItem key={opt} value={opt} className="text-xs">
+                                  {opt}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">
+                          {row.vol_cycle.toFixed(4)}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">
+                          {(row.vol_cycle * (row.boxes_per_m3 || 0)).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-sm">{row.category || "—"}</TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
-              {macroSkus.length > 50 && (
-                <p className="px-5 py-2 text-xs text-muted-foreground border-t">
-                  Mostrando los primeros 50 resultados (Total: {macroSkus.length})
-                </p>
-              )}
             </Card>
           )}
         </div>
@@ -446,7 +592,7 @@ export function Step3MacroSlotting() {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between pt-2">
+      <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t p-4 flex justify-end gap-4 z-50">
         <Button variant="outline" onClick={() => setStep(1)} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Anterior
         </Button>

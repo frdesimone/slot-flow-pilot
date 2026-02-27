@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useSlotting } from "@/context/SlottingContext";
 import { Check, Database, Search, Layers3, LayoutGrid } from "lucide-react";
 
@@ -16,15 +15,7 @@ export function WizardSidebar() {
     <aside className="w-72 min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       {/* Header */}
       <div className="px-5 py-6 border-b border-sidebar-border">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-md bg-sidebar-primary flex items-center justify-center">
-            <Layers3 className="w-4 h-4 text-sidebar-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-sm font-semibold text-sidebar-accent-foreground">Slotting Optimizer</h1>
-            <p className="text-[11px] text-sidebar-foreground/60">Warehouse Management</p>
-          </div>
-        </div>
+        <img src="/logo.jpg" alt="Logo" className="w-full object-contain max-h-16" />
       </div>
 
       {/* Steps */}

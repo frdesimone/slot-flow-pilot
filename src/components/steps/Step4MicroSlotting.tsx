@@ -265,7 +265,7 @@ export function Step4MicroSlotting() {
   const micro = state.microResult;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Micro-Slotting: Distribución Física</h2>
@@ -413,7 +413,7 @@ export function Step4MicroSlotting() {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between pt-2">
+      <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t p-4 flex justify-end gap-4 z-50">
         <Button variant="outline" onClick={() => setStep(2)} className="gap-2">
           <ArrowLeft className="w-4 h-4" /> Anterior
         </Button>

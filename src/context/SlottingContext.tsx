@@ -80,6 +80,9 @@ export interface MappingConfig {
   col_alto: string;
   col_ancho: string;
   col_largo: string;
+  col_desc: string;
+  col_cajas_m3: string;
+  col_categoria: string;
   sheet_pedidos: string;
   col_pedido_id: string;
   col_pedido_sku: string;
@@ -143,6 +146,9 @@ const defaultMappingConfig: MappingConfig = {
   col_alto: "Alto",
   col_ancho: "Ancho",
   col_largo: "Largo",
+  col_desc: "Descripción",
+  col_cajas_m3: "Cajas/M3",
+  col_categoria: "Categoría",
   sheet_pedidos: "Pedidos",
   col_pedido_id: "Nro pedido",
   col_pedido_sku: "Codigo II - Producto",
