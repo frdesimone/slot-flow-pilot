@@ -15,7 +15,7 @@ export function WizardSidebar() {
     <aside className="w-72 min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       {/* Header */}
       <div className="px-5 py-6 border-b border-sidebar-border">
-        <img src="/logo.jpg" alt="Logo" className="w-full object-contain max-h-16" />
+        <img src="/logo-bremen.jpg" alt="Logo" className="w-full object-contain max-h-16" />
       </div>
 
       {/* Steps */}
