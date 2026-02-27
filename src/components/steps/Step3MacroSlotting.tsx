@@ -28,6 +28,7 @@ type MacroSkuRow = {
   storage_type: string;
   vol_cycle: number;
   boxes_per_m3: number;
+  weight: number;
   category: string;
 };
 
@@ -70,13 +71,14 @@ function extractId(obj: Record<string, unknown>): string | null {
 
 function downloadMacroCSV(rows: MacroSkuRow[] | undefined | null) {
   const safeRows = rows ?? [];
-  const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Categoría"];
+  const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Peso (kg)", "Categoría"];
   const csvRows = safeRows.map((r) => [
     r?.sku_id ?? "",
     r?.description ?? "",
     r?.storage_type ?? "",
     (Number(r?.vol_cycle) || 0).toFixed(4),
     ((Number(r?.vol_cycle) || 0) * (Number(r?.boxes_per_m3) || 0)).toFixed(2),
+    (Number(r?.weight) || 0).toFixed(2),
     r?.category ?? "",
   ]);
   const csv = [headers.join(","), ...csvRows.map((r) => r.map((c) => (String(c).includes(",") || String(c).includes('"') ? `"${String(c).replace(/"/g, '""')}"` : c)).join(","))].join("\n");
@@ -245,6 +247,8 @@ export function Step3MacroSlotting() {
   const unassignedCount = kpi?.unassigned_count ?? 0;
 
   const [tableRows, setTableRows] = useState<MacroSkuRow[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(100);
   type SortKey = keyof MacroSkuRow | "cajas_ciclo";
   const [sortConfig, setSortConfig] = useState<{ column: SortKey; direction: "asc" | "desc" } | null>(null);
 
@@ -261,6 +265,7 @@ export function Step3MacroSlotting() {
       storage_type: String(r?.storage_type ?? ""),
       vol_cycle: Number(r?.vol_cycle ?? r?.cycle_volume ?? 0) || 0,
       boxes_per_m3: Number(r?.boxes_per_m3 ?? 0) || 0,
+      weight: Number(r?.weight ?? 0) || 0,
       category: String(r?.category ?? ""),
     }));
 
@@ -280,6 +285,7 @@ export function Step3MacroSlotting() {
   };
 
   const handleSort = (column: SortKey) => {
+    setCurrentPage(1);
     setSortConfig((prev) => {
       const nextDir = prev?.column === column && prev.direction === "asc" ? "desc" : "asc";
       return { column, direction: nextDir };
@@ -302,6 +308,21 @@ export function Step3MacroSlotting() {
       return sortConfig.direction === "asc" ? cmp : -cmp;
     });
   }, [tableRows, sortConfig]);
+
+  const totalPages = Math.max(1, Math.ceil((sortedRows?.length ?? 0) / itemsPerPage));
+  const paginatedRows = useMemo(() => {
+    const rows = sortedRows ?? [];
+    const start = (currentPage - 1) * itemsPerPage;
+    return rows.slice(start, start + itemsPerPage);
+  }, [sortedRows, currentPage, itemsPerPage]);
+
+  const paginationStart = (currentPage - 1) * itemsPerPage + 1;
+  const paginationEnd = Math.min(currentPage * itemsPerPage, sortedRows?.length ?? 0);
+  const totalItems = sortedRows?.length ?? 0;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableRows.length]);
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortConfig?.column !== col) return <ArrowUpDown className="w-3.5 h-3.5 opacity-50" />;
@@ -503,7 +524,7 @@ export function Step3MacroSlotting() {
                 <div>
                   <h3 className="text-sm font-semibold">SKUs Asignados</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {tableRows.length} SKUs · Ordenar por columna · Editar Storage Type manualmente
+                    {tableRows.length} SKUs · Ordenar por columna · Paginación · Editar Storage Type manualmente
                   </p>
                 </div>
                 <Button
@@ -560,6 +581,15 @@ export function Step3MacroSlotting() {
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("weight")}
+                        >
+                          Peso (kg) <SortIcon col="weight" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
                           onClick={() => handleSort("cajas_ciclo")}
                         >
                           Cajas de Ciclo <SortIcon col="cajas_ciclo" />
@@ -577,7 +607,7 @@ export function Step3MacroSlotting() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(sortedRows ?? []).map((row, rowIdx) => {
+                    {paginatedRows.map((row, rowIdx) => {
                       const skuId = row?.sku_id ?? `row-${rowIdx}`;
                       const volCycle = Number(row?.vol_cycle) || 0;
                       const boxesPerM3 = Number(row?.boxes_per_m3) || 0;
@@ -608,6 +638,9 @@ export function Step3MacroSlotting() {
                           {volCycle.toFixed(4)}
                         </TableCell>
                         <TableCell className="text-sm tabular-nums">
+                          {(Number(row?.weight) || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">
                           {(volCycle * boxesPerM3).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-sm">{row?.category || "—"}</TableCell>
@@ -616,6 +649,32 @@ export function Step3MacroSlotting() {
                     })}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="px-5 py-3 border-t flex items-center justify-between gap-4 flex-wrap">
+                <p className="text-sm text-muted-foreground">
+                  Mostrando {totalItems === 0 ? 0 : paginationStart} a {paginationEnd} de {totalItems} SKUs
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-sm tabular-nums px-2">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
             </Card>
           )}
