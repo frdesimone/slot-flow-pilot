@@ -56,8 +56,19 @@ export interface OutlierUbiquitousItem {
   count?: number;
 }
 
-/** Respuesta cruda de la API de outliers (arrays de objetos enriquecidos) */
+/** Categoría de outliers devuelta por la API (formato dinámico) */
+export interface AuditCategory {
+  id: string;
+  name: string;
+  target: "sku" | "order";
+  attribute?: string;
+  items: (OutlierSkuItem | OutlierOrderItem | OutlierUbiquitousItem)[];
+}
+
+/** Respuesta cruda de la API de outliers (formato dinámico por categorías) */
 export interface AuditResultsRaw {
+  categories?: AuditCategory[];
+  /** @deprecated Legacy: se mantiene para compatibilidad al extraer exclusiones */
   heavy_skus?: OutlierSkuItem[];
   bulky_skus?: OutlierSkuItem[];
   massive_orders?: OutlierOrderItem[];
@@ -125,6 +136,10 @@ export interface SlottingState {
   auditResult: AuditResult | null;
   auditResults: AuditResultsRaw | null;
   excludeOutliers: boolean;
+  /** IDs de SKUs que el usuario eligió descartar (excluir del Macro) */
+  selectedSkusToExclude: string[];
+  /** IDs de pedidos que el usuario eligió descartar (excluir del Macro) */
+  selectedOrdersToExclude: string[];
   // Step 3
   coverageDays: number | string;
   storageTypes: StorageType[];
@@ -189,6 +204,8 @@ const initialState: SlottingState = {
   auditResult: null,
   auditResults: null,
   excludeOutliers: true,
+  selectedSkusToExclude: [],
+  selectedOrdersToExclude: [],
   coverageDays: 15,
   storageTypes: defaultStorageTypes,
   macroResult: null,

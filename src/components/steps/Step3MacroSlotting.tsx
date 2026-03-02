@@ -108,9 +108,6 @@ export function Step3MacroSlotting() {
 
   const [storageTypes, setStorageTypes] = useState<MacroStorageType[]>(() => [ensureStorageType({ ...DEFAULT_STORAGE })]);
 
-  const auditResults = state?.auditResults;
-  const excludeOutliers = state?.excludeOutliers ?? false;
-
   const handleRun = async () => {
     if (!state?.dataFile) {
       toast({
@@ -127,28 +124,15 @@ export function Step3MacroSlotting() {
       const formData = new FormData();
       formData.append("file", state!.dataFile);
 
-      // Exclusiones de auditoría
-      formData.append("exclude_outliers", excludeOutliers ? "true" : "false");
+      // Exclusiones: solo los que el usuario eligió descartar en Step2 (si el switch está activo)
+      const excludeOutliers = state?.excludeOutliers ?? false;
+      const selectedSkus = state?.selectedSkusToExclude ?? [];
+      const selectedOrders = state?.selectedOrdersToExclude ?? [];
+      const hasExclusions = excludeOutliers && (selectedSkus.length > 0 || selectedOrders.length > 0);
 
-      let excluded_skus: string[] = [];
-      let excluded_orders: string[] = [];
-
-      if (excludeOutliers && auditResults) {
-        const heavy = (auditResults.heavy_skus ?? []) as Record<string, unknown>[];
-        const bulky = (auditResults.bulky_skus ?? []) as Record<string, unknown>[];
-        const massive = (auditResults.massive_orders ?? []) as Record<string, unknown>[];
-
-        excluded_skus = [...heavy, ...bulky]
-          .map(extractId)
-          .filter((id): id is string => id != null);
-
-        excluded_orders = massive
-          .map(extractOrderId)
-          .filter((id): id is string => id != null);
-      }
-
-      formData.append("excluded_skus", JSON.stringify(excluded_skus));
-      formData.append("excluded_orders", JSON.stringify(excluded_orders));
+      formData.append("exclude_outliers", hasExclusions ? "true" : "false");
+      formData.append("excluded_skus", JSON.stringify(selectedSkus));
+      formData.append("excluded_orders", JSON.stringify(selectedOrders));
 
       // Tipos de almacenamiento dinámicos (fallback seguro para strings vacíos)
       const safeStorageTypes = (storageTypes ?? []).map((st) => {
@@ -249,6 +233,9 @@ export function Step3MacroSlotting() {
   const [tableRows, setTableRows] = useState<MacroSkuRow[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(100);
+  const [filterText, setFilterText] = useState("");
+  const [filterStorageType, setFilterStorageType] = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<string>("");
   type SortKey = keyof MacroSkuRow | "cajas_ciclo";
   const [sortConfig, setSortConfig] = useState<{ column: SortKey; direction: "asc" | "desc" } | null>(null);
 
@@ -292,8 +279,35 @@ export function Step3MacroSlotting() {
     });
   };
 
-  const sortedRows = useMemo(() => {
+  const uniqueCategories = useMemo(() => {
     const rows = tableRows ?? [];
+    const cats = new Set(rows.map((r) => (r?.category ?? "").trim()).filter(Boolean));
+    return [...cats].sort();
+  }, [tableRows]);
+
+  const filteredSkus = useMemo(() => {
+    const rows = tableRows ?? [];
+    const text = (filterText ?? "").trim().toLowerCase();
+    const st = (filterStorageType ?? "").trim();
+    const cat = (filterCategory ?? "").trim();
+    return rows.filter((r) => {
+      if (text) {
+        const matches = (r?.sku_id ?? "").toLowerCase().includes(text) ||
+          (r?.description ?? "").toLowerCase().includes(text);
+        if (!matches) return false;
+      }
+      if (st && (r?.storage_type ?? "").trim() !== st) return false;
+      if (cat && (r?.category ?? "").trim() !== cat) return false;
+      return true;
+    });
+  }, [tableRows, filterText, filterStorageType, filterCategory]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterText, filterStorageType, filterCategory]);
+
+  const sortedRows = useMemo(() => {
+    const rows = filteredSkus;
     if (!sortConfig) return rows;
     return [...rows].sort((a, b) => {
       const aVal = sortConfig.column === "cajas_ciclo"
@@ -307,7 +321,7 @@ export function Step3MacroSlotting() {
         : (Number(aVal) - Number(bVal));
       return sortConfig.direction === "asc" ? cmp : -cmp;
     });
-  }, [tableRows, sortConfig]);
+  }, [filteredSkus, sortConfig]);
 
   const totalPages = Math.max(1, Math.ceil((sortedRows?.length ?? 0) / itemsPerPage));
   const paginatedRows = useMemo(() => {
@@ -524,7 +538,7 @@ export function Step3MacroSlotting() {
                 <div>
                   <h3 className="text-sm font-semibold">SKUs Asignados</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {tableRows.length} SKUs · Ordenar por columna · Paginación · Editar Storage Type manualmente
+                    {tableRows.length} SKUs · Filtros · Ordenar · Paginación · Editar Storage Type manualmente
                   </p>
                 </div>
                 <Button
@@ -536,6 +550,40 @@ export function Step3MacroSlotting() {
                   <Download className="w-4 h-4" />
                   Exportar a CSV
                 </Button>
+              </div>
+              <div className="px-5 py-3 border-b flex flex-wrap items-center gap-3">
+                <Input
+                  placeholder="Buscar por Código o Descripción"
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  className="h-9 max-w-[240px] text-sm"
+                />
+                <Select value={filterStorageType || "all"} onValueChange={(v) => setFilterStorageType(v === "all" ? "" : v)}>
+                  <SelectTrigger className="h-9 w-[180px] text-sm">
+                    <SelectValue placeholder="Filtrar por Storage Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {(storageTypeOptions ?? []).map((opt, idx) => (
+                      <SelectItem key={opt ?? `st-${idx}`} value={opt ?? ""}>
+                        {opt ?? ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterCategory || "all"} onValueChange={(v) => setFilterCategory(v === "all" ? "" : v)}>
+                  <SelectTrigger className="h-9 w-[180px] text-sm">
+                    <SelectValue placeholder="Filtrar por Categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {uniqueCategories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="overflow-auto max-h-[500px]">
                 <Table>
