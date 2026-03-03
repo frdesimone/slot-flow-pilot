@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import { TrayData } from "@/context/SlottingContext";
-import { ArrowLeft, Play, Settings2, Download, AlertTriangle } from "lucide-react";
+import type { BestTrayItem } from "@/context/SlottingContext";
+import { ArrowLeft, Play, Settings2, Download, AlertTriangle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+
+type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
 
 function KPIMini({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
@@ -46,19 +47,30 @@ function getVlmSkusIds(macroResult: { macro_skus?: Array<Record<string, unknown>
     .filter((id): id is string => id != null);
 }
 
-function downloadMicroCSV(traysPerVLM: TrayData[][]) {
-  const rows: string[][] = [["SKU ID", "Tray ID", "VLM ID", "Slot/Position"]];
-  traysPerVLM.forEach((trays, vlmIdx) => {
-    trays.forEach((tray) => {
-      (tray.skus ?? []).forEach((sku, slotIdx) => {
+function downloadMicroCSV(bestTrays: BestTrayItem[] | undefined | null) {
+  const trays = bestTrays ?? [];
+  const rows: string[][] = [["Tray ID", "Occupancy %", "Item Count", "SKU", "Vol"]];
+  trays.forEach((tray) => {
+    const items = tray?.items ?? [];
+    if (items.length === 0) {
+      rows.push([
+        String(tray?.tray_id ?? ""),
+        String(tray?.occupancy_pct ?? 0),
+        String(tray?.item_count ?? 0),
+        "",
+        "",
+      ]);
+    } else {
+      items.forEach((item, idx) => {
         rows.push([
-          String(sku.id ?? ""),
-          String(tray.id ?? ""),
-          String(tray.vlmId ?? vlmIdx + 1),
-          String(tray.groupId ?? slotIdx + 1),
+          idx === 0 ? String(tray?.tray_id ?? "") : "",
+          idx === 0 ? String(tray?.occupancy_pct ?? 0) : "",
+          idx === 0 ? String(tray?.item_count ?? 0) : "",
+          String(item?.sku ?? ""),
+          String(item?.vol ?? 0),
         ]);
       });
-    });
+    }
   });
   const csv = rows.map((r) => r.map((c) => (c.includes(",") || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
@@ -70,88 +82,10 @@ function downloadMicroCSV(traysPerVLM: TrayData[][]) {
   URL.revokeObjectURL(url);
 }
 
-function getHeatColor(fill: number): string {
-  if (fill > 85) return "bg-red-500/80";
-  if (fill > 60) return "bg-orange-400/80";
-  if (fill > 35) return "bg-yellow-400/80";
-  if (fill > 10) return "bg-emerald-400/80";
-  return "bg-emerald-200/50";
-}
-
-function TrayGrid({ trays, vlmIndex }: { trays: TrayData[]; vlmIndex: number }) {
-  const [selected, setSelected] = useState<TrayData | null>(null);
-  const cols = 6;
-
-  return (
-    <>
-      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-        {trays.map((tray, idx) => (
-          <button
-            key={tray.id}
-            onClick={() => setSelected(tray)}
-            className={`heat-cell aspect-square flex items-center justify-center text-[10px] font-mono font-medium text-foreground/80 hover:ring-2 hover:ring-primary ${getHeatColor(tray.volumeFill)}`}
-            title={`${tray.volumeFill}% vol · ${tray.skus.length} SKUs`}
-          >
-            {idx + 1}
-          </button>
-        ))}
-        {/* Empty slots */}
-        {Array.from({ length: Math.max(0, 50 - trays.length) }).map((_, i) => (
-          <div key={`empty-${i}`} className="heat-cell aspect-square bg-muted/40 rounded" />
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-3 mt-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-200/50" /> &lt;10%</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-400/80" /> 10-35%</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-400/80" /> 35-60%</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-400/80" /> 60-85%</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-500/80" /> &gt;85%</span>
-      </div>
-
-      {/* Tray detail dialog */}
-      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-sm">
-              Bandeja {selected?.id} — VLM {vlmIndex + 1}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <KPIMini label="Llenado Volumen" value={selected?.volumeFill || 0} unit="%" />
-            <KPIMini label="Llenado Peso" value={selected?.weightFill || 0} unit="%" />
-          </div>
-          <div className="text-xs font-medium mb-2">SKUs Contenidos ({selected?.skus?.length ?? 0})</div>
-          <div className="max-h-48 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">ID</TableHead>
-                  <TableHead className="text-xs">Descripción</TableHead>
-                  <TableHead className="text-xs text-right">Uds</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(selected?.skus ?? []).slice(0, 50).map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-mono text-[11px]">{s.id}</TableCell>
-                    <TableCell className="text-[11px]">{s.description}</TableCell>
-                    <TableCell className="text-right text-[11px]">{s.units}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {(selected?.skus?.length ?? 0) > 50 && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Mostrando los primeros 50 resultados (Total: {selected?.skus?.length ?? 0})
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+function getOccupancyBadgeClass(pct: number): string {
+  if (pct > 80) return "bg-emerald-500/90 text-white border-emerald-600";
+  if (pct > 50) return "bg-amber-500/90 text-white border-amber-600";
+  return "bg-red-500/90 text-white border-red-600";
 }
 
 export function Step4MicroSlotting() {
@@ -221,12 +155,19 @@ export function Step4MicroSlotting() {
       let data: import("@/context/SlottingContext").MicroResult;
       try {
         const raw = await response.json();
-        const traysPerVLM = Array.isArray(raw?.traysPerVLM) ? raw.traysPerVLM : [];
+        const dataObj = raw?.data ?? raw;
+        const bestTrays = Array.isArray(dataObj?.best_trays) ? dataObj.best_trays : [];
+        const kpi = raw?.kpi ?? dataObj?.kpi ?? {};
         data = {
-          vlmCount: typeof raw?.vlmCount === "number" ? raw.vlmCount : 0,
-          traysPerVLM,
-          heightEfficiency: typeof raw?.heightEfficiency === "number" ? raw.heightEfficiency : 0,
-          areaEfficiency: typeof raw?.areaEfficiency === "number" ? raw.areaEfficiency : 0,
+          best_trays: bestTrays,
+          kpi: {
+            total_trays: typeof kpi?.total_trays === "number" ? kpi.total_trays : 0,
+            skus_placed: typeof kpi?.skus_placed === "number" ? kpi.skus_placed : 0,
+            avg_area_occupancy_pct: typeof kpi?.avg_area_occupancy_pct === "number" ? kpi.avg_area_occupancy_pct : 0,
+            optimized: Boolean(kpi?.optimized),
+          },
+          heightEfficiency: typeof raw?.heightEfficiency === "number" ? raw.heightEfficiency : kpi?.avg_area_occupancy_pct ?? 0,
+          areaEfficiency: typeof raw?.areaEfficiency === "number" ? raw.areaEfficiency : kpi?.avg_area_occupancy_pct ?? 0,
           avgTraysPerOrder: typeof raw?.avgTraysPerOrder === "number" ? raw.avgTraysPerOrder : 0,
           replicationCoverage: typeof raw?.replicationCoverage === "number" ? raw.replicationCoverage : 0,
         };
@@ -263,6 +204,57 @@ export function Step4MicroSlotting() {
   };
 
   const micro = state.microResult;
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("occupancy_desc");
+
+  const allTrays = micro?.best_trays ?? [];
+
+  const filteredAndSortedTrays = useMemo(() => {
+    let list = [...allTrays];
+    const term = (searchTerm ?? "").trim().toLowerCase();
+    if (term) {
+      list = list.filter((t) => {
+        const trayId = String(t?.tray_id ?? "").toLowerCase();
+        if (trayId.includes(term)) return true;
+        const items = t?.items ?? [];
+        return items.some((it) => String(it?.sku ?? "").toLowerCase().includes(term));
+      });
+    }
+    if (sortBy === "occupancy_desc") {
+      list.sort((a, b) => (Number(b?.occupancy_pct ?? 0) - Number(a?.occupancy_pct ?? 0)));
+    } else if (sortBy === "occupancy_asc") {
+      list.sort((a, b) => (Number(a?.occupancy_pct ?? 0) - Number(b?.occupancy_pct ?? 0)));
+    } else if (sortBy === "items_desc") {
+      list.sort((a, b) => (Number(b?.item_count ?? 0) - Number(a?.item_count ?? 0)));
+    }
+    return list;
+  }, [allTrays, searchTerm, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedTrays.length / itemsPerPage));
+  const paginatedTrays = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedTrays.slice(start, start + itemsPerPage);
+  }, [filteredAndSortedTrays, currentPage, itemsPerPage]);
+
+  const paginationStart = (currentPage - 1) * itemsPerPage + 1;
+  const paginationEnd = Math.min(currentPage * itemsPerPage, filteredAndSortedTrays.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortBy]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [allTrays.length]);
+
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="space-y-8 pb-20">
@@ -359,45 +351,122 @@ export function Step4MicroSlotting() {
         <div className="space-y-6 animate-slide-in">
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPIMini label="Eficiencia Altura" value={micro.heightEfficiency} unit="%" />
-            <KPIMini label="Eficiencia Área" value={micro.areaEfficiency} unit="%" />
-            <KPIMini label="Bandejas/Orden" value={micro.avgTraysPerOrder} />
-            <KPIMini label="Cobertura Replicación" value={micro.replicationCoverage} unit="%" />
+            <KPIMini label="Total Bandejas" value={micro.kpi?.total_trays ?? 0} />
+            <KPIMini label="SKUs Colocados" value={micro.kpi?.skus_placed ?? 0} />
+            <KPIMini label="Ocupación Promedio" value={micro.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
+            <KPIMini label="Optimizado" value={micro.kpi?.optimized ? "Sí" : "No"} />
           </div>
 
-          {/* Tabs per VLM */}
+          {/* Grilla de bandejas (best_trays) */}
           <Card>
-            <Tabs defaultValue="vlm-0">
-              <div className="px-5 py-3 border-b flex items-center justify-between">
-                <TabsList className="h-9">
-                  {(micro.traysPerVLM ?? []).map((_, i) => (
-                    <TabsTrigger key={i} value={`vlm-${i}`} className="text-xs px-4">
-                      VLM {i + 1}
-                      <Badge variant="secondary" className="ml-2 text-[10px]">{(micro.traysPerVLM ?? [])[i]?.length ?? 0}</Badge>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => downloadMicroCSV(micro.traysPerVLM ?? [])}
-                >
-                  <Download className="w-4 h-4" />
-                  Exportar a CSV
-                </Button>
-              </div>
-              {(micro.traysPerVLM ?? []).map((trays, i) => (
-                <TabsContent key={i} value={`vlm-${i}`} className="p-5">
-                  <div className="mb-3">
-                    <p className="text-xs text-muted-foreground">
-                      {trays.length} bandejas ocupadas · Click en una bandeja para ver SKUs contenidos
-                    </p>
+            <div className="px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Package className="w-4 h-4" /> Bandejas Asignadas
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => downloadMicroCSV(micro.best_trays)}
+              >
+                <Download className="w-4 h-4" />
+                Exportar a CSV
+              </Button>
+            </div>
+            <div className="px-5 py-3 border-b flex flex-wrap items-center gap-3">
+              <Input
+                placeholder="Buscar por ID de bandeja o SKU"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 max-w-[280px] text-sm"
+              />
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                <SelectTrigger className="h-9 w-[200px] text-sm">
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="occupancy_desc">Mayor Ocupación</SelectItem>
+                  <SelectItem value="occupancy_asc">Menor Ocupación</SelectItem>
+                  <SelectItem value="items_desc">Más Items</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <CardContent className="p-5">
+              {(!micro.best_trays || micro.best_trays.length === 0) ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm font-medium">No hay bandejas para mostrar</p>
+                  <p className="text-xs mt-1">El backend no devolvió bandejas o la lista está vacía.</p>
+                </div>
+              ) : filteredAndSortedTrays.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <p className="text-sm font-medium">Sin resultados para la búsqueda</p>
+                  <p className="text-xs mt-1">Prueba con otro término o limpia el filtro.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {paginatedTrays.map((tray, idx) => {
+                      const pct = Number(tray?.occupancy_pct ?? 0);
+                      const itemCount = Number(tray?.item_count ?? 0);
+                      const items = tray?.items ?? [];
+                      return (
+                        <Card key={tray?.tray_id ?? idx} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
+                          <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
+                            <span className="font-mono text-sm font-semibold truncate" title={tray?.tray_id}>
+                              {tray?.tray_id ?? `Bandeja ${idx + 1}`}
+                            </span>
+                            <Badge className={`shrink-0 text-[10px] font-medium ${getOccupancyBadgeClass(pct)}`}>
+                              {pct.toFixed(1)}%
+                            </Badge>
+                          </CardHeader>
+                          <CardContent className="px-4 pb-4 pt-0">
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Items en bandeja: <strong>{itemCount}</strong>
+                            </p>
+                            <ScrollArea className="h-24 rounded-md border">
+                              <ul className="p-2 space-y-1 text-xs font-mono">
+                                {items.map((item, i) => (
+                                  <li key={`${item?.sku ?? i}-${i}`} className="truncate">
+                                    {item?.sku ?? "-"}
+                                  </li>
+                                ))}
+                              </ul>
+                            </ScrollArea>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
-                  <TrayGrid trays={trays ?? []} vlmIndex={i} />
-                </TabsContent>
-              ))}
-            </Tabs>
+                  <div className="mt-5 pt-4 border-t flex items-center justify-between gap-4 flex-wrap">
+                    <p className="text-sm text-muted-foreground">
+                      Mostrando {filteredAndSortedTrays.length === 0 ? 0 : paginationStart} a {paginationEnd} de {filteredAndSortedTrays.length} bandejas
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-sm tabular-nums px-2">
+                        Página {currentPage} de {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
           </Card>
         </div>
       )}

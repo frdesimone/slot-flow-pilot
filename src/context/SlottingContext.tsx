@@ -96,13 +96,29 @@ export interface TrayData {
   weightFill: number;
 }
 
+/** Bandeja del nuevo formato best_trays: tray_id, occupancy_pct, item_count, items */
+export interface BestTrayItem {
+  tray_id: string;
+  occupancy_pct: number;
+  item_count: number;
+  items: { sku: string; vol: number }[];
+}
+
 export interface MicroResult {
-  vlmCount: number;
-  traysPerVLM: TrayData[][];
-  heightEfficiency: number;
-  areaEfficiency: number;
-  avgTraysPerOrder: number;
-  replicationCoverage: number;
+  vlmCount?: number;
+  traysPerVLM?: TrayData[][];
+  /** Nuevo formato: array de bandejas desde data.best_trays */
+  best_trays?: BestTrayItem[];
+  heightEfficiency?: number;
+  areaEfficiency?: number;
+  avgTraysPerOrder?: number;
+  replicationCoverage?: number;
+  kpi?: {
+    total_trays?: number;
+    skus_placed?: number;
+    avg_area_occupancy_pct?: number;
+    optimized?: boolean;
+  };
 }
 
 export interface MappingConfig {

@@ -30,6 +30,9 @@ type MacroSkuRow = {
   boxes_per_m3: number;
   weight: number;
   category: string;
+  height?: number;
+  width?: number;
+  length?: number;
 };
 
 const DEFAULT_STORAGE: MacroStorageType = {
@@ -71,7 +74,7 @@ function extractId(obj: Record<string, unknown>): string | null {
 
 function downloadMacroCSV(rows: MacroSkuRow[] | undefined | null) {
   const safeRows = rows ?? [];
-  const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Peso (kg)", "Categoría"];
+  const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Peso (kg)", "Categoría", "Alto (mm)", "Ancho (mm)", "Largo (mm)"];
   const csvRows = safeRows.map((r) => [
     r?.sku_id ?? "",
     r?.description ?? "",
@@ -80,6 +83,9 @@ function downloadMacroCSV(rows: MacroSkuRow[] | undefined | null) {
     ((Number(r?.vol_cycle) || 0) * (Number(r?.boxes_per_m3) || 0)).toFixed(2),
     (Number(r?.weight) || 0).toFixed(2),
     r?.category ?? "",
+    r?.height != null ? String(r.height) : "-",
+    r?.width != null ? String(r.width) : "-",
+    r?.length != null ? String(r.length) : "-",
   ]);
   const csv = [headers.join(","), ...csvRows.map((r) => r.map((c) => (String(c).includes(",") || String(c).includes('"') ? `"${String(c).replace(/"/g, '""')}"` : c)).join(","))].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
@@ -254,6 +260,9 @@ export function Step3MacroSlotting() {
       boxes_per_m3: Number(r?.boxes_per_m3 ?? 0) || 0,
       weight: Number(r?.weight ?? 0) || 0,
       category: String(r?.category ?? ""),
+      height: r?.height != null ? Number(r.height) : undefined,
+      width: r?.width != null ? Number(r.width) : undefined,
+      length: r?.length != null ? Number(r.length) : undefined,
     }));
 
   useEffect(() => {
@@ -652,6 +661,33 @@ export function Step3MacroSlotting() {
                           Categoría <SortIcon col="category" />
                         </button>
                       </TableHead>
+                      <TableHead className="text-right">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("height")}
+                        >
+                          Alto (mm) <SortIcon col="height" />
+                        </button>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("width")}
+                        >
+                          Ancho (mm) <SortIcon col="width" />
+                        </button>
+                      </TableHead>
+                      <TableHead className="text-right">
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 hover:text-foreground font-medium"
+                          onClick={() => handleSort("length")}
+                        >
+                          Largo (mm) <SortIcon col="length" />
+                        </button>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -692,6 +728,15 @@ export function Step3MacroSlotting() {
                           {(volCycle * boxesPerM3).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-sm">{row?.category || "—"}</TableCell>
+                        <TableCell className="text-sm tabular-nums text-right">
+                          {row?.height != null ? row.height : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums text-right">
+                          {row?.width != null ? row.width : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums text-right">
+                          {row?.length != null ? row.length : "-"}
+                        </TableCell>
                       </TableRow>
                       );
                     })}
