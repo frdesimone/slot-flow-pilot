@@ -136,6 +136,7 @@ export interface MappingConfig {
   col_pedido_id: string;
   col_pedido_sku: string;
   col_pedido_cant: string;
+  col_pedido_fecha: string;
 }
 
 export interface SlottingState {
@@ -206,6 +207,7 @@ const defaultMappingConfig: MappingConfig = {
   col_pedido_id: "Nro pedido",
   col_pedido_sku: "Codigo II - Producto",
   col_pedido_cant: "Cantidad unidades",
+  col_pedido_fecha: "Fecha",
 };
 
 const initialState: SlottingState = {

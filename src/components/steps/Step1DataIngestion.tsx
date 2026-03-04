@@ -282,6 +282,14 @@ export function Step1DataIngestion() {
                       className="h-8 text-xs"
                     />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fecha del Pedido (col_pedido_fecha)</Label>
+                    <Input
+                      value={state.mappingConfig.col_pedido_fecha}
+                      onChange={(e) => setMappingConfig({ col_pedido_fecha: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </div>
