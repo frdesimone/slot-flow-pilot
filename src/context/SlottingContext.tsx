@@ -65,9 +65,20 @@ export interface AuditCategory {
   items: (OutlierSkuItem | OutlierOrderItem | OutlierUbiquitousItem)[];
 }
 
+/** Validación de lectura de columnas (maestro o pedidos) */
+export interface DataValidationRaw {
+  found_columns?: string[];
+  missing_columns?: string[];
+  sample_data?: Record<string, unknown>[];
+}
+
 /** Respuesta cruda de la API de outliers (formato dinámico por categorías) */
 export interface AuditResultsRaw {
   categories?: AuditCategory[];
+  validation?: {
+    maestro?: DataValidationRaw | null;
+    pedidos?: DataValidationRaw | null;
+  };
   /** @deprecated Legacy: se mantiene para compatibilidad al extraer exclusiones */
   heavy_skus?: OutlierSkuItem[];
   bulky_skus?: OutlierSkuItem[];

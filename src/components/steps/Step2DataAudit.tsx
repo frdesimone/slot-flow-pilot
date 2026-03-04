@@ -1,9 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import type { AuditResultsRaw, OutlierSkuItem, OutlierOrderItem, OutlierUbiquitousItem } from "@/context/SlottingContext";
+import type { AuditResultsRaw, OutlierSkuItem, OutlierOrderItem, OutlierUbiquitousItem, DataValidationRaw } from "@/context/SlottingContext";
 import { ArrowRight, ArrowLeft, Zap, Download, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,6 +49,68 @@ const DEFAULT_RULES: OutlierRule[] = [
 
 function generateRuleId(): string {
   return `regla_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function ValidationColumn({ title, data }: { title: string; data: DataValidationRaw }) {
+  const found = data?.found_columns ?? [];
+  const missing = data?.missing_columns ?? [];
+  const sample = data?.sample_data ?? [];
+  const hasMissing = missing.length > 0;
+  const headers = sample.length > 0 ? Object.keys(sample[0] ?? {}) : [];
+
+  return (
+    <Card className="border">
+      <CardContent className="pt-4 space-y-3">
+        <h4 className="text-sm font-semibold">{title}</h4>
+        <div className="flex flex-wrap gap-2">
+          {found.map((col) => (
+            <Badge key={col} variant="secondary" className="bg-emerald-600/90 text-white border-0">
+              {col}
+            </Badge>
+          ))}
+          {missing.map((col) => (
+            <Badge key={col} variant="destructive">
+              {col}
+            </Badge>
+          ))}
+        </div>
+        {hasMissing && (
+          <Alert variant="destructive">
+            <AlertTitle>Columnas faltantes</AlertTitle>
+            <AlertDescription>
+              El algoritmo puede fallar o usar valores por defecto (ej: raíz cúbica para dimensiones).
+            </AlertDescription>
+          </Alert>
+        )}
+        {sample.length > 0 && headers.length > 0 && (
+          <div className="overflow-auto max-h-48">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {headers.map((h) => (
+                    <TableHead key={h} className="text-xs">
+                      {h}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sample.map((row, idx) => (
+                  <TableRow key={idx}>
+                    {headers.map((h) => (
+                      <TableCell key={h} className="text-xs">
+                        {row[h] != null ? String(row[h]) : ""}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 /** Formatea un outlier para mostrar: "[ID] - [Descripción] (Valor)" */
@@ -114,6 +179,9 @@ export function Step2DataAudit() {
   const auditResults = state.auditResults;
   const hasResults = auditResults != null;
   const categories = auditResults?.categories ?? [];
+  const validation = auditResults?.validation;
+  const maestroValidation = validation?.maestro ?? null;
+  const pedidosValidation = validation?.pedidos ?? null;
 
   const updateRule = useCallback((idx: number, updates: Partial<OutlierRule>) => {
     setRules((prev) => prev.map((r, i) => (i === idx ? { ...r, ...updates } : r)));
@@ -414,6 +482,32 @@ export function Step2DataAudit() {
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="ml-3 text-sm text-muted-foreground">Procesando auditoría de datos...</p>
         </div>
+      )}
+
+      {hasResults && (maestroValidation || pedidosValidation) && (
+        <Accordion type="single" collapsible defaultValue="diagnostico" className="border rounded-xl bg-card/60 shadow-sm">
+          <AccordionItem value="diagnostico" className="border-none">
+            <AccordionTrigger className="px-5 py-4 text-sm font-semibold hover:no-underline">
+              Diagnóstico de Lectura de Datos
+            </AccordionTrigger>
+            <AccordionContent className="px-5 pb-5 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {maestroValidation && (
+                  <ValidationColumn
+                    title="Maestro de Códigos"
+                    data={maestroValidation}
+                  />
+                )}
+                {pedidosValidation && (
+                  <ValidationColumn
+                    title="Pedidos"
+                    data={pedidosValidation}
+                  />
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       )}
 
       {hasResults && categories.length > 0 && (
