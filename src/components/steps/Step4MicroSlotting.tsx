@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/use-toast";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
@@ -91,7 +92,11 @@ function getOccupancyBadgeClass(pct: number): string {
 export function Step4MicroSlotting() {
   const { state, updateState, completeStep, setStep } = useSlotting();
   const [running, setRunning] = useState(false);
+  const [weights, setWeights] = useState({ affinity: 75, rotation: 15, height: 10 });
   const { toast } = useToast();
+
+  const weightsSum = weights.affinity + weights.rotation + weights.height;
+  const weightsValid = weightsSum === 100;
 
   const macroResult = state.macroResult;
   const vlmSkusIds = getVlmSkusIds(macroResult);
@@ -129,6 +134,9 @@ export function Step4MicroSlotting() {
       formData.append("include_zero_rot", String(state.includeNoRotation));
       formData.append("optimize_trays", "true");
       formData.append("opt_time_ms", "2000");
+      formData.append("weight_affinity", (weights.affinity / 100).toString());
+      formData.append("weight_rotation", (weights.rotation / 100).toString());
+      formData.append("weight_height", (weights.height / 100).toString());
 
       // SKUs asignados al VLM por el Macro (sincronización Paso 3 → Paso 4)
       formData.append("vlm_skus_ids", JSON.stringify(vlmSkusIds));
@@ -269,8 +277,13 @@ export function Step4MicroSlotting() {
               {vlmSkusIds.length} SKUs seleccionados por el Macro Slotting para VLM.
             </p>
           )}
+          {!weightsValid && (
+            <p className="text-sm text-red-600 font-medium mt-2">
+              La suma debe ser 100%. Actual: {weightsSum}%
+            </p>
+          )}
         </div>
-        <Button onClick={handleRun} disabled={running || !hasMacroResults} className="gap-2" size="lg">
+        <Button onClick={handleRun} disabled={running || !hasMacroResults || !weightsValid} className="gap-2" size="lg">
           <Play className="w-4 h-4" />
           {running ? "Optimizando..." : "Ejecutar Micro-Slotting"}
         </Button>
@@ -326,6 +339,59 @@ export function Step4MicroSlotting() {
               <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: e.target.value === "" ? "" : (parseFloat(e.target.value) || 80) })} className="h-9" />
             </div>
           </div>
+
+          <Accordion type="single" collapsible className="mt-5 border rounded-lg bg-muted/30">
+            <AccordionItem value="weights" className="border-none">
+              <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+                Configuración Avanzada de Pesos
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 pt-0">
+                <p className="text-xs text-muted-foreground mb-4">
+                  Los pesos definen cómo el algoritmo prioriza Afinidad, Rotación y Altura al agrupar SKUs en bandejas. La suma debe ser exactamente 100%.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Afinidad (%) — Co-ocurrencia en pedidos</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={weights.affinity}
+                      onChange={(e) => setWeights((w) => ({ ...w, affinity: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Rotación (%) — Frecuencia de venta</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={weights.rotation}
+                      onChange={(e) => setWeights((w) => ({ ...w, rotation: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Altura (%) — Compatibilidad dimensional</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={weights.height}
+                      onChange={(e) => setWeights((w) => ({ ...w, height: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                {!weightsValid && (
+                  <p className="text-sm text-red-600 font-medium mt-3">
+                    La suma debe ser 100%. Actual: {weightsSum}%
+                  </p>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </CardContent>
       </Card>
 

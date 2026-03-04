@@ -133,6 +133,7 @@ export interface MicroResult {
 }
 
 export interface MappingConfig {
+  period_days: number;
   sheet_maestro: string;
   col_sku_maestro: string;
   col_volumen: string;
@@ -204,6 +205,7 @@ const defaultStorageTypes: StorageType[] = [
 ];
 
 const defaultMappingConfig: MappingConfig = {
+  period_days: 180,
   sheet_maestro: "Base Cód.",
   col_sku_maestro: "Material",
   col_volumen: "M3/UMB",
