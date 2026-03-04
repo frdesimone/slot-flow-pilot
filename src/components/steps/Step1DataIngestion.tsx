@@ -226,7 +226,7 @@ export function Step1DataIngestion() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Columna Cajas por M3 (col_cajas_m3)</Label>
+                      <Label className="text-xs">M3 por Caja (Volumen Masterpack) (col_cajas_m3)</Label>
                       <Input
                         value={state.mappingConfig.col_cajas_m3}
                         onChange={(e) => setMappingConfig({ col_cajas_m3: e.target.value })}
