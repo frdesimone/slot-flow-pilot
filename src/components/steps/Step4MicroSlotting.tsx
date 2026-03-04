@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
@@ -47,6 +49,34 @@ function getVlmSkusIds(macroResult: { macro_skus?: Array<Record<string, unknown>
     .map(extractSkuId)
     .filter((id): id is string => id != null);
 }
+
+function getUniqueStorageTypes(macroResult: { macro_skus?: Array<Record<string, unknown>> } | null): string[] {
+  if (!macroResult?.macro_skus?.length) return [];
+  const seen = new Set<string>();
+  for (const row of macroResult.macro_skus as Array<Record<string, unknown>>) {
+    const st = row.storage_type ?? row.storageType;
+    if (st != null && String(st).trim()) {
+      seen.add(String(st).trim());
+    }
+  }
+  return Array.from(seen).sort();
+}
+
+type StorageConfigForm = {
+  maxTrays: string;
+  maxWeight: string;
+  trayLength: string;
+  trayWidth: string;
+  isFixedHeight: boolean;
+};
+
+const DEFAULT_STORAGE_CONFIG: StorageConfigForm = {
+  maxTrays: "100",
+  maxWeight: "250",
+  trayLength: "2400",
+  trayWidth: "800",
+  isFixedHeight: false,
+};
 
 function downloadMicroCSV(bestTrays: BestTrayItem[] | undefined | null) {
   const trays = bestTrays ?? [];
@@ -93,14 +123,29 @@ export function Step4MicroSlotting() {
   const { state, updateState, completeStep, setStep } = useSlotting();
   const [running, setRunning] = useState(false);
   const [weights, setWeights] = useState({ affinity: 75, rotation: 15, height: 10 });
+  const [storageConfigs, setStorageConfigs] = useState<Record<string, StorageConfigForm>>({});
   const { toast } = useToast();
 
   const weightsSum = weights.affinity + weights.rotation + weights.height;
   const weightsValid = weightsSum === 100;
 
   const macroResult = state.macroResult;
+  const storageTypeList = useMemo(() => getUniqueStorageTypes(macroResult), [macroResult]);
   const vlmSkusIds = getVlmSkusIds(macroResult);
   const hasMacroResults = (macroResult?.macro_skus?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (storageTypeList.length === 0) return;
+    setStorageConfigs((prev) => {
+      const next = { ...prev };
+      for (const st of storageTypeList) {
+        if (!(st in next)) {
+          next[st] = { ...DEFAULT_STORAGE_CONFIG };
+        }
+      }
+      return next;
+    });
+  }, [storageTypeList.join(",")]);
 
   const handleRun = async () => {
     if (!state.dataFile) {
@@ -124,29 +169,43 @@ export function Step4MicroSlotting() {
     try {
       setRunning(true);
 
-      const formData = new FormData();
-      formData.append("file", state.dataFile);
-
-      // Parámetros propios de Micro-Slotting (fallback seguro para strings vacíos)
-      formData.append("cycle_days", String(Number(state.coverageDays) || 15));
-      formData.append("n_vlms", String(Number(state.vlmCount) || 4));
-      formData.append("n_trays_per_vlm", String(Number(state.traysPerVLM) || 50));
-      formData.append("include_zero_rot", String(state.includeNoRotation));
-      formData.append("optimize_trays", "true");
-      formData.append("opt_time_ms", "2000");
-      formData.append("weight_affinity", (weights.affinity / 100).toString());
-      formData.append("weight_rotation", (weights.rotation / 100).toString());
-      formData.append("weight_height", (weights.height / 100).toString());
-
-      // SKUs asignados al VLM por el Macro (sincronización Paso 3 → Paso 4)
-      formData.append("vlm_skus_ids", JSON.stringify(vlmSkusIds));
-
-      // Mapping de columnas y hojas
-      Object.entries(state.mappingConfig).forEach(([key, value]) => {
-        formData.append(key, value);
+      const storages = storageTypeList.map((st) => {
+        const cfg = storageConfigs[st] ?? DEFAULT_STORAGE_CONFIG;
+        const lenNum = parseFloat(cfg.trayLength) || 2400;
+        const widthNum = parseFloat(cfg.trayWidth) || 800;
+        return {
+          storage_type: st,
+          max_trays: Math.max(1, parseInt(cfg.maxTrays, 10) || 100),
+          max_weight: Math.max(0, parseFloat(cfg.maxWeight) || 250),
+          tray_length: lenNum > 100 ? lenNum / 1000 : lenNum,
+          tray_width: widthNum > 100 ? widthNum / 1000 : widthNum,
+          is_fixed_height: cfg.isFixedHeight,
+        };
       });
 
-      // Sin timeout en cliente: el análisis puede tardar varios minutos
+      const payload = {
+        storages,
+        skus: (macroResult?.macro_skus ?? []) as Record<string, unknown>[],
+        weights: {
+          affinity: weights.affinity / 100,
+          rotation: weights.rotation / 100,
+          height: weights.height / 100,
+        },
+        cycle_days: Number(state.coverageDays) || 15,
+        include_zero_rot: state.includeNoRotation,
+        optimize_trays: true,
+        opt_time_ms: 2000,
+        n_vlms: Number(state.vlmCount) || 4,
+        n_trays_per_vlm: Number(state.traysPerVLM) || 50,
+        mapping: state.mappingConfig as Record<string, unknown>,
+        period_days: Number(state.mappingConfig?.period_days) || 180,
+        vlm_skus_ids: vlmSkusIds,
+      };
+
+      const formData = new FormData();
+      formData.append("file", state.dataFile);
+      formData.append("payload", JSON.stringify(payload));
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/micro`, {
         method: "POST",
         headers: {
@@ -164,18 +223,36 @@ export function Step4MicroSlotting() {
       try {
         const raw = await response.json();
         const dataObj = raw?.data ?? raw;
-        const bestTrays = Array.isArray(dataObj?.best_trays) ? dataObj.best_trays : [];
+        const resultsByStorage = raw?.results_by_storage ?? dataObj?.results_by_storage ?? {};
+        let bestTrays: import("@/context/SlottingContext").BestTrayItem[] = [];
+        let totalTrays = 0;
+        let skusPlaced = 0;
+        const occList: number[] = [];
+        for (const st of Object.keys(resultsByStorage)) {
+          const r = resultsByStorage[st];
+          const trays = Array.isArray(r?.best_trays) ? r.best_trays : [];
+          bestTrays = bestTrays.concat(trays);
+          if (r?.kpi) {
+            totalTrays += r.kpi.total_trays ?? 0;
+            skusPlaced += r.kpi.skus_placed ?? 0;
+            if ((r.kpi.total_trays ?? 0) > 0) occList.push(r.kpi.avg_area_occupancy_pct ?? 0);
+          }
+        }
+        if (bestTrays.length === 0 && Array.isArray(dataObj?.best_trays)) {
+          bestTrays = dataObj.best_trays;
+        }
         const kpi = raw?.kpi ?? dataObj?.kpi ?? {};
         data = {
           best_trays: bestTrays,
+          results_by_storage: resultsByStorage,
           kpi: {
-            total_trays: typeof kpi?.total_trays === "number" ? kpi.total_trays : 0,
-            skus_placed: typeof kpi?.skus_placed === "number" ? kpi.skus_placed : 0,
-            avg_area_occupancy_pct: typeof kpi?.avg_area_occupancy_pct === "number" ? kpi.avg_area_occupancy_pct : 0,
+            total_trays: totalTrays || (typeof kpi?.total_trays === "number" ? kpi.total_trays : 0),
+            skus_placed: skusPlaced || (typeof kpi?.skus_placed === "number" ? kpi.skus_placed : 0),
+            avg_area_occupancy_pct: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : (typeof kpi?.avg_area_occupancy_pct === "number" ? kpi.avg_area_occupancy_pct : 0),
             optimized: Boolean(kpi?.optimized),
           },
-          heightEfficiency: typeof raw?.heightEfficiency === "number" ? raw.heightEfficiency : kpi?.avg_area_occupancy_pct ?? 0,
-          areaEfficiency: typeof raw?.areaEfficiency === "number" ? raw.areaEfficiency : kpi?.avg_area_occupancy_pct ?? 0,
+          heightEfficiency: typeof raw?.heightEfficiency === "number" ? raw.heightEfficiency : (occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0),
+          areaEfficiency: typeof raw?.areaEfficiency === "number" ? raw.areaEfficiency : (occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0),
           avgTraysPerOrder: typeof raw?.avgTraysPerOrder === "number" ? raw.avgTraysPerOrder : 0,
           replicationCoverage: typeof raw?.replicationCoverage === "number" ? raw.replicationCoverage : 0,
         };
@@ -217,18 +294,48 @@ export function Step4MicroSlotting() {
   const [itemsPerPage] = useState(20);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("occupancy_desc");
+  const [activeStorageTab, setActiveStorageTab] = useState("");
 
-  const allTrays = micro?.best_trays ?? [];
+  const resultsByStorage = useMemo(() => {
+    const rbs = micro?.results_by_storage;
+    if (rbs && Object.keys(rbs).length > 0) return rbs;
+    if (micro?.best_trays?.length) {
+      return {
+        Todos: {
+          kpi: micro.kpi ?? {},
+          best_trays: micro.best_trays,
+        },
+      };
+    }
+    return {};
+  }, [micro]);
+
+  const storageTabKeys = Object.keys(resultsByStorage);
+  const effectiveActiveTab = activeStorageTab && storageTabKeys.includes(activeStorageTab)
+    ? activeStorageTab
+    : storageTabKeys[0] ?? "";
+
+  useEffect(() => {
+    if (storageTabKeys.length > 0 && !storageTabKeys.includes(activeStorageTab)) {
+      setActiveStorageTab(storageTabKeys[0]);
+    }
+  }, [storageTabKeys.join(","), activeStorageTab]);
+
+  const traysForActiveTab = resultsByStorage[effectiveActiveTab]?.best_trays ?? [];
 
   const filteredAndSortedTrays = useMemo(() => {
-    let list = [...allTrays];
+    let list = [...traysForActiveTab];
     const term = (searchTerm ?? "").trim().toLowerCase();
     if (term) {
       list = list.filter((t) => {
         const trayId = String(t?.tray_id ?? "").toLowerCase();
         if (trayId.includes(term)) return true;
         const items = t?.items ?? [];
-        return items.some((it) => String(it?.sku ?? "").toLowerCase().includes(term));
+        return items.some((it) => {
+          const sku = String(it?.sku ?? "").toLowerCase();
+          const desc = String(it?.description ?? "").toLowerCase();
+          return sku.includes(term) || desc.includes(term);
+        });
       });
     }
     if (sortBy === "occupancy_desc") {
@@ -239,7 +346,7 @@ export function Step4MicroSlotting() {
       list.sort((a, b) => (Number(b?.item_count ?? 0) - Number(a?.item_count ?? 0)));
     }
     return list;
-  }, [allTrays, searchTerm, sortBy]);
+  }, [traysForActiveTab, searchTerm, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedTrays.length / itemsPerPage));
   const paginatedTrays = useMemo(() => {
@@ -252,11 +359,7 @@ export function Step4MicroSlotting() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, sortBy]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [allTrays.length]);
+  }, [searchTerm, sortBy, effectiveActiveTab]);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
@@ -274,7 +377,7 @@ export function Step4MicroSlotting() {
           </p>
           {hasMacroResults && (
             <p className="text-xs text-muted-foreground mt-1">
-              {vlmSkusIds.length} SKUs seleccionados por el Macro Slotting para VLM.
+              {storageTypeList.length} tipo(s) de almacenamiento: {storageTypeList.join(", ")}. {vlmSkusIds.length} SKUs para VLM.
             </p>
           )}
           {!weightsValid && (
@@ -339,6 +442,108 @@ export function Step4MicroSlotting() {
               <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: e.target.value === "" ? "" : (parseFloat(e.target.value) || 80) })} className="h-9" />
             </div>
           </div>
+
+          {storageTypeList.length === 0 && hasMacroResults && (
+            <p className="text-xs text-amber-600 mt-3">No se detectaron tipos de almacenamiento en macro_skus.</p>
+          )}
+
+          {storageTypeList.length > 0 && (
+            <Accordion type="single" collapsible defaultValue="storage-0" className="mt-5 border rounded-lg bg-muted/30">
+              {storageTypeList.map((st, idx) => {
+                const cfg = storageConfigs[st] ?? DEFAULT_STORAGE_CONFIG;
+                return (
+                  <AccordionItem key={st} value={`storage-${idx}`} className="border-none">
+                    <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
+                      Configuración: {st}
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4 pt-0">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Bandejas máx</Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={cfg.maxTrays}
+                            onChange={(e) =>
+                              setStorageConfigs((prev) => ({
+                                ...prev,
+                                [st]: { ...prev[st], maxTrays: e.target.value },
+                              }))
+                            }
+                            className="h-9"
+                            placeholder="100"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Peso Máximo (kg)</Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={cfg.maxWeight}
+                            onChange={(e) =>
+                              setStorageConfigs((prev) => ({
+                                ...prev,
+                                [st]: { ...prev[st], maxWeight: e.target.value },
+                              }))
+                            }
+                            className="h-9"
+                            placeholder="250"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Largo (mm)</Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={cfg.trayLength}
+                            onChange={(e) =>
+                              setStorageConfigs((prev) => ({
+                                ...prev,
+                                [st]: { ...prev[st], trayLength: e.target.value },
+                              }))
+                            }
+                            className="h-9"
+                            placeholder="2400"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Ancho (mm)</Label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={cfg.trayWidth}
+                            onChange={(e) =>
+                              setStorageConfigs((prev) => ({
+                                ...prev,
+                                [st]: { ...prev[st], trayWidth: e.target.value },
+                              }))
+                            }
+                            className="h-9"
+                            placeholder="800"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-4">
+                        <Switch
+                          id={`fixed-height-${st}`}
+                          checked={cfg.isFixedHeight}
+                          onCheckedChange={(checked) =>
+                            setStorageConfigs((prev) => ({
+                              ...prev,
+                              [st]: { ...prev[st], isFixedHeight: checked },
+                            }))
+                          }
+                        />
+                        <Label htmlFor={`fixed-height-${st}`} className="text-xs cursor-pointer">
+                          ¿Altura Fija? (Ignorar optimización de alturas)
+                        </Label>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          )}
 
           <Accordion type="single" collapsible className="mt-5 border rounded-lg bg-muted/30">
             <AccordionItem value="weights" className="border-none">
@@ -412,128 +617,157 @@ export function Step4MicroSlotting() {
         </Card>
       )}
 
-      {/* Results: se muestran aunque esté running, para no perder resultados previos si hay error */}
-      {micro && (
+      {/* Results: data.results_by_storage con Tabs por tipo de almacenamiento */}
+      {micro && storageTabKeys.length > 0 && (
         <div className="space-y-6 animate-slide-in">
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPIMini label="Total Bandejas" value={micro.kpi?.total_trays ?? 0} />
-            <KPIMini label="SKUs Colocados" value={micro.kpi?.skus_placed ?? 0} />
-            <KPIMini label="Ocupación Promedio" value={micro.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
-            <KPIMini label="Optimizado" value={micro.kpi?.optimized ? "Sí" : "No"} />
-          </div>
+          <Tabs value={effectiveActiveTab} onValueChange={setActiveStorageTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 max-w-md lg:grid-cols-4">
+              {storageTabKeys.map((st) => (
+                <TabsTrigger key={st} value={st} className="gap-1">
+                  {st}
+                  <Badge variant="secondary" className="text-[10px]">
+                    {resultsByStorage[st]?.best_trays?.length ?? 0}
+                  </Badge>
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {/* Grilla de bandejas (best_trays) */}
-          <Card>
-            <div className="px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Package className="w-4 h-4" /> Bandejas Asignadas
-              </h3>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => downloadMicroCSV(micro.best_trays)}
-              >
-                <Download className="w-4 h-4" />
-                Exportar a CSV
-              </Button>
-            </div>
-            <div className="px-5 py-3 border-b flex flex-wrap items-center gap-3">
-              <Input
-                placeholder="Buscar por ID de bandeja o SKU"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-9 max-w-[280px] text-sm"
-              />
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                <SelectTrigger className="h-9 w-[200px] text-sm">
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="occupancy_desc">Mayor Ocupación</SelectItem>
-                  <SelectItem value="occupancy_asc">Menor Ocupación</SelectItem>
-                  <SelectItem value="items_desc">Más Items</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <CardContent className="p-5">
-              {(!micro.best_trays || micro.best_trays.length === 0) ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm font-medium">No hay bandejas para mostrar</p>
-                  <p className="text-xs mt-1">El backend no devolvió bandejas o la lista está vacía.</p>
+            {storageTabKeys.map((st) => (
+              <TabsContent key={st} value={st} className="mt-6 space-y-4">
+                {/* KPIs por Tab */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <KPIMini label="Bandejas usadas" value={resultsByStorage[st]?.kpi?.total_trays ?? 0} />
+                  <KPIMini label="Ocupación %" value={resultsByStorage[st]?.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
+                  <KPIMini label="SKUs Colocados" value={resultsByStorage[st]?.kpi?.skus_placed ?? 0} />
+                  <KPIMini label="Optimizado" value={resultsByStorage[st]?.kpi?.optimized ? "Sí" : "No"} />
                 </div>
-              ) : filteredAndSortedTrays.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <p className="text-sm font-medium">Sin resultados para la búsqueda</p>
-                  <p className="text-xs mt-1">Prueba con otro término o limpia el filtro.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {paginatedTrays.map((tray, idx) => {
-                      const pct = Number(tray?.occupancy_pct ?? 0);
-                      const itemCount = Number(tray?.item_count ?? 0);
-                      const items = tray?.items ?? [];
-                      return (
-                        <Card key={tray?.tray_id ?? idx} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
-                          <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
-                            <span className="font-mono text-sm font-semibold truncate" title={tray?.tray_id}>
-                              {tray?.tray_id ?? `Bandeja ${idx + 1}`}
+
+                {/* Grilla de bandejas */}
+                <Card>
+                  <div className="px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Package className="w-4 h-4" /> Bandejas Asignadas — {st}
+                    </h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => downloadMicroCSV(resultsByStorage[st]?.best_trays)}
+                    >
+                      <Download className="w-4 h-4" />
+                      Exportar a CSV
+                    </Button>
+                  </div>
+                  <div className="px-5 py-3 border-b flex flex-wrap items-center gap-3">
+                    <Input
+                      placeholder="Buscar por ID de bandeja o SKU"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="h-9 max-w-[280px] text-sm"
+                    />
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                      <SelectTrigger className="h-9 w-[200px] text-sm">
+                        <SelectValue placeholder="Ordenar por" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="occupancy_desc">Mayor Ocupación</SelectItem>
+                        <SelectItem value="occupancy_asc">Menor Ocupación</SelectItem>
+                        <SelectItem value="items_desc">Más Items</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <CardContent className="p-5">
+                    {st !== effectiveActiveTab ? null : (resultsByStorage[st]?.best_trays?.length ?? 0) === 0 ? (
+                      <div className="py-12 text-center text-muted-foreground">
+                        <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                        <p className="text-sm font-medium">No hay bandejas para mostrar</p>
+                        <p className="text-xs mt-1">El backend no devolvió bandejas o la lista está vacía.</p>
+                      </div>
+                    ) : filteredAndSortedTrays.length === 0 ? (
+                      <div className="py-12 text-center text-muted-foreground">
+                        <p className="text-sm font-medium">Sin resultados para la búsqueda</p>
+                        <p className="text-xs mt-1">Prueba con otro término o limpia el filtro.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {paginatedTrays.map((tray, idx) => {
+                            const pct = Number(tray?.occupancy_pct ?? 0);
+                            const itemCount = Number(tray?.item_count ?? 0);
+                            const items = tray?.items ?? [];
+                            return (
+                              <Card key={tray?.tray_id ?? idx} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
+                                <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
+                                  <span className="font-mono text-sm font-semibold truncate" title={tray?.tray_id}>
+                                    {tray?.tray_id ?? `Bandeja ${idx + 1}`}
+                                  </span>
+                                  <Badge className={`shrink-0 text-[10px] font-medium ${getOccupancyBadgeClass(pct)}`}>
+                                    {pct.toFixed(1)}%
+                                  </Badge>
+                                </CardHeader>
+                                <CardContent className="px-4 pb-4 pt-0">
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Items en bandeja: <strong>{itemCount}</strong>
+                                  </p>
+                                  <ScrollArea className="h-32 rounded-md border">
+                                    <ul className="p-2 space-y-1.5 text-xs">
+                                      {items.map((item, i) => {
+                                        const sku = item?.sku ?? "-";
+                                        const desc = item?.description ?? "";
+                                        const vol = Number(item?.vol ?? 0);
+                                        const boxes = Number(item?.boxes ?? 0);
+                                        const mainText = desc ? `${sku} - ${desc}` : sku;
+                                        return (
+                                          <li key={`${item?.sku ?? i}-${i}`} className="truncate">
+                                            <span className="font-mono block truncate" title={mainText}>
+                                              {mainText}
+                                            </span>
+                                            <span className="text-muted-foreground text-[10px] block truncate">
+                                              Vol: {vol.toFixed(4)} m³ | Cajas: {boxes.toFixed(2)}
+                                            </span>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </ScrollArea>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-5 pt-4 border-t flex items-center justify-between gap-4 flex-wrap">
+                          <p className="text-sm text-muted-foreground">
+                            Mostrando {paginationStart} a {paginationEnd} de {filteredAndSortedTrays.length} bandejas
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                              disabled={currentPage <= 1}
+                            >
+                              Anterior
+                            </Button>
+                            <span className="text-sm tabular-nums px-2">
+                              Página {currentPage} de {totalPages}
                             </span>
-                            <Badge className={`shrink-0 text-[10px] font-medium ${getOccupancyBadgeClass(pct)}`}>
-                              {pct.toFixed(1)}%
-                            </Badge>
-                          </CardHeader>
-                          <CardContent className="px-4 pb-4 pt-0">
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Items en bandeja: <strong>{itemCount}</strong>
-                            </p>
-                            <ScrollArea className="h-24 rounded-md border">
-                              <ul className="p-2 space-y-1 text-xs font-mono">
-                                {items.map((item, i) => (
-                                  <li key={`${item?.sku ?? i}-${i}`} className="truncate">
-                                    {item?.sku ?? "-"}
-                                  </li>
-                                ))}
-                              </ul>
-                            </ScrollArea>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-5 pt-4 border-t flex items-center justify-between gap-4 flex-wrap">
-                    <p className="text-sm text-muted-foreground">
-                      Mostrando {filteredAndSortedTrays.length === 0 ? 0 : paginationStart} a {paginationEnd} de {filteredAndSortedTrays.length} bandejas
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage <= 1}
-                      >
-                        Anterior
-                      </Button>
-                      <span className="text-sm tabular-nums px-2">
-                        Página {currentPage} de {totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage >= totalPages}
-                      >
-                        Siguiente
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                              disabled={currentPage >= totalPages}
+                            >
+                              Siguiente
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            ))}
+          </Tabs>
         </div>
       )}
 

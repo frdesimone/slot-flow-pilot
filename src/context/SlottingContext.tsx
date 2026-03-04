@@ -112,7 +112,7 @@ export interface BestTrayItem {
   tray_id: string;
   occupancy_pct: number;
   item_count: number;
-  items: { sku: string; vol: number }[];
+  items: { sku: string; vol: number; description?: string; boxes?: number }[];
 }
 
 export interface MicroResult {
@@ -120,6 +120,8 @@ export interface MicroResult {
   traysPerVLM?: TrayData[][];
   /** Nuevo formato: array de bandejas desde data.best_trays */
   best_trays?: BestTrayItem[];
+  /** Resultados por tipo de almacenamiento (VLM, Jaula, etc.) */
+  results_by_storage?: Record<string, { kpi: Record<string, unknown>; best_trays: BestTrayItem[] }>;
   heightEfficiency?: number;
   areaEfficiency?: number;
   avgTraysPerOrder?: number;
