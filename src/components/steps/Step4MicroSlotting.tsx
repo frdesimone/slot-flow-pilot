@@ -54,9 +54,9 @@ function getUniqueStorageTypes(macroResult: { macro_skus?: Array<Record<string, 
   if (!macroResult?.macro_skus?.length) return [];
   const seen = new Set<string>();
   for (const row of macroResult.macro_skus as Array<Record<string, unknown>>) {
-    const st = row.storage_type ?? row.storageType;
-    if (st != null && String(st).trim()) {
-      seen.add(String(st).trim());
+    const st = String(row.storage_type ?? row.storageType ?? "").trim();
+    if (st && st.toUpperCase() !== "UNASSIGNED") {
+      seen.add(st);
     }
   }
   return Array.from(seen).sort();
@@ -183,9 +183,20 @@ export function Step4MicroSlotting() {
         };
       });
 
+      const sku_storage_mapping: Record<string, string> = {};
+      if (macroResult?.macro_skus) {
+        (macroResult.macro_skus as Array<Record<string, unknown>>).forEach((s) => {
+          const id = extractSkuId(s);
+          const st = s.storage_type ?? s.storageType;
+          if (id && st) {
+            sku_storage_mapping[id] = String(st).trim();
+          }
+        });
+      }
+
       const payload = {
         storages,
-        skus: (macroResult?.macro_skus ?? []) as Record<string, unknown>[],
+        sku_storage_mapping,
         weights: {
           affinity: weights.affinity / 100,
           rotation: weights.rotation / 100,
@@ -195,8 +206,6 @@ export function Step4MicroSlotting() {
         include_zero_rot: state.includeNoRotation,
         optimize_trays: true,
         opt_time_ms: 2000,
-        n_vlms: Number(state.vlmCount) || 4,
-        n_trays_per_vlm: Number(state.traysPerVLM) || 50,
         mapping: state.mappingConfig as Record<string, unknown>,
         period_days: Number(state.mappingConfig?.period_days) || 180,
         vlm_skus_ids: vlmSkusIds,
@@ -416,30 +425,10 @@ export function Step4MicroSlotting() {
           <p className="text-xs text-muted-foreground mt-0.5">Días de cobertura, hardware y dimensiones</p>
         </div>
         <CardContent className="py-5">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Días de Cobertura (cycle days)</Label>
               <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15) })} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Cantidad VLMs</Label>
-              <Input type="number" value={state.vlmCount} onChange={(e) => updateState({ vlmCount: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 4) })} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Bandejas/VLM</Label>
-              <Input type="number" value={state.traysPerVLM} onChange={(e) => updateState({ traysPerVLM: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 50) })} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Ancho (m)</Label>
-              <Input type="number" step="0.1" value={state.trayWidth} onChange={(e) => updateState({ trayWidth: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.6) })} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Profundidad (m)</Label>
-              <Input type="number" step="0.1" value={state.trayDepth} onChange={(e) => updateState({ trayDepth: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.4) })} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Carga Máx (kg)</Label>
-              <Input type="number" value={state.trayMaxWeight} onChange={(e) => updateState({ trayMaxWeight: e.target.value === "" ? "" : (parseFloat(e.target.value) || 80) })} className="h-9" />
             </div>
           </div>
 
