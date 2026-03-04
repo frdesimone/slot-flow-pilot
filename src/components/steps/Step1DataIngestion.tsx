@@ -150,6 +150,25 @@ export function Step1DataIngestion() {
               Ajusta los nombres de hojas y columnas exactamente como aparecen en tus archivos Excel/CSV.
               La coincidencia será case-insensitive en el backend.
             </p>
+            <div className="grid gap-2 mb-5">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Configuración General
+              </h3>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Días de historial de pedidos (ej: 180 para 6 meses)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={state.mappingConfig.period_days ?? 180}
+                  onChange={(e) =>
+                    setMappingConfig({
+                      period_days: Math.max(1, parseInt(e.target.value, 10) || 180),
+                    })
+                  }
+                  className="h-8 text-xs max-w-[140px]"
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <Card className="border-dashed">
                 <CardContent className="pt-4 space-y-3">
