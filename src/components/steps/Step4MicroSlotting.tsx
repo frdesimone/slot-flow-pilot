@@ -629,6 +629,11 @@ export function Step4MicroSlotting() {
                   <KPIMini label="Ocupación %" value={resultsByStorage[st]?.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
                   <KPIMini label="SKUs Colocados" value={resultsByStorage[st]?.kpi?.skus_placed ?? 0} />
                   <KPIMini label="Optimizado" value={resultsByStorage[st]?.kpi?.optimized ? "Sí" : "No"} />
+                  <div className="col-span-2 lg:col-span-4 flex items-center gap-2">
+                    <Badge variant="destructive" className="text-orange-600 bg-orange-100 border-orange-300 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800">
+                      Aire Desperdiciado Total: {(resultsByStorage[st]?.kpi?.total_wasted_vol ?? 0).toFixed(2)} m³
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* Grilla de bandejas */}
@@ -695,6 +700,9 @@ export function Step4MicroSlotting() {
                                   </Badge>
                                 </CardHeader>
                                 <CardContent className="px-4 pb-4 pt-0">
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    Altura Estante: {((tray?.max_height ?? 0) * 1000).toFixed(0)} mm | Aire: {(tray?.wasted_vol ?? 0).toFixed(4)} m³
+                                  </p>
                                   <p className="text-xs text-muted-foreground mb-2">
                                     Items en bandeja: <strong>{itemCount}</strong>
                                   </p>
@@ -713,6 +721,7 @@ export function Step4MicroSlotting() {
                                             </span>
                                             <span className="text-muted-foreground text-[10px] block truncate">
                                               Vol: {vol.toFixed(4)} m³ | Cajas: {boxes.toFixed(2)}
+                                              {typeof item?.height === "number" ? ` | Alto: ${(item.height * 1000).toFixed(0)} mm` : ""}
                                             </span>
                                           </li>
                                         );
