@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSlotting } from "@/context/SlottingContext";
 import type { BestTrayItem } from "@/context/SlottingContext";
-import { ArrowLeft, Play, Settings2, Download, AlertTriangle, Package } from "lucide-react";
+import { ArrowLeft, Play, Settings2, Download, AlertTriangle, Package, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
 
@@ -304,6 +306,7 @@ export function Step4MicroSlotting() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("occupancy_desc");
   const [activeStorageTab, setActiveStorageTab] = useState("");
+  const [selectedTray, setSelectedTray] = useState<BestTrayItem | null>(null);
 
   const resultsByStorage = useMemo(() => {
     const rbs = micro?.results_by_storage;
@@ -692,12 +695,19 @@ export function Step4MicroSlotting() {
                             return (
                               <Card key={tray?.tray_id ?? idx} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
                                 <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
-                                  <span className="font-mono text-sm font-semibold truncate" title={tray?.tray_id}>
-                                    {tray?.tray_id ?? `Bandeja ${idx + 1}`}
-                                  </span>
-                                  <Badge className={`shrink-0 text-[10px] font-medium ${getOccupancyBadgeClass(pct)}`}>
-                                    {pct.toFixed(1)}%
-                                  </Badge>
+                                  <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
+                                    <CardTitle className="text-sm font-bold truncate" title={tray?.tray_id}>
+                                      {tray?.tray_id ?? `Bandeja ${idx + 1}`}
+                                    </CardTitle>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Badge className={`text-[10px] font-medium ${getOccupancyBadgeClass(pct)}`}>
+                                        {pct.toFixed(1)}%
+                                      </Badge>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedTray(tray)}>
+                                        <Maximize2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </CardHeader>
                                 <CardContent className="px-4 pb-4 pt-0">
                                   <p className="text-xs text-muted-foreground mb-1">
@@ -785,6 +795,74 @@ export function Step4MicroSlotting() {
           <ArrowLeft className="w-4 h-4" /> Anterior
         </Button>
       </div>
+
+      {/* Modal de Detalle de Bandeja */}
+      <Dialog open={!!selectedTray} onOpenChange={(open) => !open && setSelectedTray(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Detalle de Bandeja: {selectedTray?.tray_id}</DialogTitle>
+            <DialogDescription>
+              Desglose completo de SKUs y métricas de espacio.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTray && (
+            <>
+              {/* Panel de Estadísticas Destacadas */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/40 rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Ocupación</p>
+                  <p className="text-xl font-bold">{(selectedTray.occupancy_pct ?? 0).toFixed(2)}%</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cantidad SKUs</p>
+                  <p className="text-xl font-bold">{selectedTray.item_count ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Altura Estante</p>
+                  <p className="text-xl font-bold">{((selectedTray.max_height ?? 0) * 1000).toFixed(0)} mm</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Aire Desperdiciado</p>
+                  <p className="text-xl font-bold text-orange-600">{(selectedTray.wasted_vol ?? 0).toFixed(4)} m³</p>
+                </div>
+              </div>
+
+              {/* Tabla de SKUs */}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead className="text-right">Altura (mm)</TableHead>
+                      <TableHead className="text-right">Volumen (m³)</TableHead>
+                      <TableHead className="text-right">Cajas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(selectedTray.items ?? []).map((item: Record<string, unknown>, idx: number) => (
+                      <TableRow key={`${item.sku ?? ""}-${idx}`}>
+                        <TableCell className="font-medium">{String(item.sku ?? "-")}</TableCell>
+                        <TableCell>{String(item.description ?? "")}</TableCell>
+                        <TableCell className="text-right">
+                          {typeof item.height === "number" ? (item.height * 1000).toFixed(0) : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {typeof item.vol === "number" ? item.vol.toFixed(4) : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {typeof item.boxes === "number" ? item.boxes.toFixed(2) : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
