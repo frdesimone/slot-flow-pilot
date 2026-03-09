@@ -30,10 +30,10 @@ export interface OutlierRule {
 const SKU_ATTRIBUTES = [
   { value: "weight", label: "Peso (kg)" },
   { value: "volume", label: "Volumen (m³)" },
-  { value: "height", label: "Alto (mm)" },
-  { value: "width", label: "Ancho (mm)" },
-  { value: "length", label: "Largo (mm)" },
-  { value: "boxes_per_m3", label: "Cajas por m³" },
+  { value: "height", label: "Alto (cm)" },
+  { value: "width", label: "Ancho (cm)" },
+  { value: "length", label: "Largo (cm)" },
+  { value: "boxes_per_m3", label: "UM venta a UM repos." },
   { value: "frequency", label: "Frecuencia en pedidos (0-1)" },
 ];
 

@@ -94,7 +94,7 @@ function extractId(obj: Record<string, unknown>): string | null {
 
 function downloadMacroCSV(rows: MacroSkuRow[] | undefined | null) {
   const safeRows = rows ?? [];
-  const headers = ["SKU", "Descripción", "Storage Type", "Categoría", "Dimensiones (L x A x H)", "Unid. Reposición", "Vol. Total (m³)", "Peso Total (KG)"];
+  const headers = ["SKU", "Descripción", "Storage Type", "Categoría", "Dimensiones en cm (L x A x H)", "Unid. Reposición", "Vol. Total (m³)", "Peso Total (KG)"];
   const csvRows = safeRows.map((r) => [
     r?.sku_id ?? "",
     r?.description ?? "",
@@ -805,7 +805,7 @@ export function Step3MacroSlotting() {
                           Categoría <SortIcon col="category" />
                         </button>
                       </TableHead>
-                      <TableHead>Dimensiones (L x A x H)</TableHead>
+                      <TableHead>Dimensiones en cm (L x A x H)</TableHead>
                       <TableHead>
                         <button
                           type="button"
