@@ -1,14 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSlotting, type MacroResult } from "@/context/SlottingContext";
-import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 
 type MacroStorageType = {
   name: string;
@@ -109,6 +112,7 @@ function extractOrderId(obj: Record<string, unknown>): string | null {
 
 export function Step3MacroSlotting() {
   const { state, updateState, completeStep, setStep, macroParams, setMacroParams, isMacroRunning, setIsMacroRunning } = useSlotting();
+  const auditResults = state?.auditResults ?? null;
   const { toast } = useToast();
 
   const [storageTypes, setStorageTypes] = useState<MacroStorageType[]>(() => {
@@ -118,6 +122,7 @@ export function Step3MacroSlotting() {
     }
     return [ensureStorageType({ ...DEFAULT_STORAGE })];
   });
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setMacroParams((prev) => ({ ...prev, storageTypes }));
@@ -149,12 +154,12 @@ export function Step3MacroSlotting() {
       formData.append("excluded_skus", JSON.stringify(selectedSkus));
       formData.append("excluded_orders", JSON.stringify(selectedOrders));
 
-      // Tipos de almacenamiento dinámicos (fallback seguro para strings vacíos)
-      const safeStorageTypes = (storageTypes ?? []).map((st) => {
+      // Tipos de almacenamiento dinámicos (prioridad = índice + 1)
+      const safeStorageTypes = (storageTypes ?? []).map((st, idx) => {
         const safe = ensureStorageType(st);
         return {
           name: safe.name,
-          priority: Number(safe.priority) || 1,
+          priority: idx + 1,
           cycle_days: Number(safe.cycle_days) || 15,
           max_volume: Number(safe.max_volume) || 0.1,
           max_weight: Number(safe.max_weight) || 25,
@@ -240,6 +245,16 @@ export function Step3MacroSlotting() {
     setStorageTypes((prev) => (prev ?? []).filter((_, i) => i !== idx));
   };
 
+  const handleDrop = (dropIndex: number) => {
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+    const newStorages = [...(storageTypes ?? [])];
+    const draggedItem = newStorages[draggedIndex];
+    newStorages.splice(draggedIndex, 1);
+    newStorages.splice(dropIndex, 0, draggedItem);
+    setStorageTypes(newStorages);
+    setDraggedIndex(null);
+  };
+
   const macro = state?.macroResult ?? null;
   const kpi = macro?.kpi;
   const allocations = kpi?.allocations ?? {};
@@ -302,6 +317,17 @@ export function Step3MacroSlotting() {
     const cats = new Set(rows.map((r) => (r?.category ?? "").trim()).filter(Boolean));
     return [...cats].sort();
   }, [tableRows]);
+
+  const availableCategories = useMemo(() => {
+    const fromSample = (auditResults?.validation?.maestro?.sample_data ?? []) as Record<string, unknown>[];
+    const fromSampleCats = fromSample
+      .map((r) => {
+        const v = r?.Categoría ?? r?.categoria;
+        return v != null ? String(v).trim() : "";
+      })
+      .filter(Boolean);
+    return [...new Set([...fromSampleCats, ...uniqueCategories])].sort();
+  }, [auditResults?.validation?.maestro?.sample_data, uniqueCategories]);
 
   const filteredSkus = useMemo(() => {
     const rows = tableRows ?? [];
@@ -417,15 +443,22 @@ export function Step3MacroSlotting() {
                 {(storageTypes ?? []).map((st, idx) => {
                   const safe = ensureStorageType(st);
                   return (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={safe.priority}
-                        onChange={(e) => updateStorageType(idx, "priority", e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 1))}
-                        className="h-8 w-16 text-xs"
-                      />
+                  <TableRow
+                    key={idx}
+                    draggable={true}
+                    onDragStart={() => setDraggedIndex(idx)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(idx)}
+                    onDragEnd={() => setDraggedIndex(null)}
+                    className={cn("transition-opacity", draggedIndex === idx ? "opacity-50" : "opacity-100")}
+                  >
+                    <TableCell className="w-20">
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          Prioridad {idx + 1}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -488,13 +521,49 @@ export function Step3MacroSlotting() {
                         className="h-8 text-xs"
                       />
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        placeholder="A, B, C (comas)"
-                        value={safe.allowed_categories ?? ""}
-                        onChange={(e) => updateStorageType(idx, "allowed_categories", e.target.value)}
-                        className="h-8 text-xs"
-                      />
+                    <TableCell className="min-w-[140px]">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between h-8 text-xs font-normal min-w-[120px]">
+                            <span className="truncate">
+                              {safe.allowed_categories && safe.allowed_categories.trim()
+                                ? safe.allowed_categories.split(",").map((c) => c.trim()).filter(Boolean).join(", ")
+                                : "Todas (por defecto)"}
+                            </span>
+                            <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto" align="start">
+                          {availableCategories.length > 0 ? (
+                            availableCategories.map((cat: string) => {
+                              const currentCats =
+                                typeof safe.allowed_categories === "string"
+                                  ? safe.allowed_categories
+                                      .split(",")
+                                      .map((c) => c.trim())
+                                      .filter(Boolean)
+                                  : [];
+                              const isSelected = currentCats.includes(cat);
+                              return (
+                                <DropdownMenuCheckboxItem
+                                  key={cat}
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    const newCats = checked
+                                      ? [...currentCats, cat]
+                                      : currentCats.filter((c: string) => c !== cat);
+                                    updateStorageType(idx, "allowed_categories", newCats.join(", "));
+                                  }}
+                                >
+                                  {cat}
+                                </DropdownMenuCheckboxItem>
+                              );
+                            })
+                          ) : (
+                            <div className="p-2 text-sm text-muted-foreground">No hay categorías en auditoría</div>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                     <TableCell>
                       <Button
