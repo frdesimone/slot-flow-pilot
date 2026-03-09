@@ -8,9 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -62,22 +60,6 @@ function getUniqueStorageTypes(macroResult: { macro_skus?: Array<Record<string, 
   return Array.from(seen).sort();
 }
 
-type StorageConfigForm = {
-  maxTrays: string;
-  maxWeight: string;
-  trayLength: string;
-  trayWidth: string;
-  isFixedHeight: boolean;
-};
-
-const DEFAULT_STORAGE_CONFIG: StorageConfigForm = {
-  maxTrays: "100",
-  maxWeight: "250",
-  trayLength: "2400",
-  trayWidth: "800",
-  isFixedHeight: false,
-};
-
 function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
   const locs = locations ?? [];
   const rows: string[][] = [
@@ -127,7 +109,7 @@ function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
 }
 
 export function Step4MicroSlotting() {
-  const { state, updateState, completeStep, setStep, microParams, setMicroParams, isMicroRunning, setIsMicroRunning } = useSlotting();
+  const { state, updateState, completeStep, setStep, macroParams, microParams, setMicroParams, isMicroRunning, setIsMicroRunning } = useSlotting();
   const { toast } = useToast();
 
   const [weights, setWeights] = useState(() => {
@@ -142,14 +124,6 @@ export function Step4MicroSlotting() {
     return { affinity: 75, rotation: 15, height: 10 };
   });
 
-  const [storageConfigs, setStorageConfigs] = useState<Record<string, StorageConfigForm>>(() => {
-    const saved = microParams?.storageConfigs;
-    if (saved && typeof saved === "object" && Object.keys(saved).length > 0) {
-      return saved as Record<string, StorageConfigForm>;
-    }
-    return {};
-  });
-
   const weightsSum = weights.affinity + weights.rotation + weights.height;
   const weightsValid = weightsSum === 100;
 
@@ -159,32 +133,8 @@ export function Step4MicroSlotting() {
   const hasMacroResults = (macroResult?.macro_skus?.length ?? 0) > 0;
 
   useEffect(() => {
-    if (microParams?.cycleDays != null) {
-      updateState({ coverageDays: microParams.cycleDays });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (storageTypeList.length === 0) return;
-    setStorageConfigs((prev) => {
-      const next = { ...prev };
-      for (const st of storageTypeList) {
-        if (!(st in next)) {
-          next[st] = { ...DEFAULT_STORAGE_CONFIG };
-        }
-      }
-      return next;
-    });
-  }, [storageTypeList.join(",")]);
-
-  useEffect(() => {
-    setMicroParams((prev) => ({
-      ...prev,
-      storageConfigs,
-      weights,
-      cycleDays: state.coverageDays,
-    }));
-  }, [storageConfigs, weights, state.coverageDays, setMicroParams]);
+    setMicroParams((prev) => ({ ...prev, weights }));
+  }, [weights, setMicroParams]);
 
   const handleRun = async () => {
     if (!state.dataFile) {
@@ -208,19 +158,68 @@ export function Step4MicroSlotting() {
     try {
       setIsMicroRunning(true);
 
-      const storages = storageTypeList.map((st) => {
-        const cfg = storageConfigs[st] ?? DEFAULT_STORAGE_CONFIG;
-        const lenNum = parseFloat(cfg.trayLength) || 2400;
-        const widthNum = parseFloat(cfg.trayWidth) || 800;
-        return {
-          storage_type: st,
-          max_trays: Math.max(1, parseInt(cfg.maxTrays, 10) || 100),
-          max_weight: Math.max(0, parseFloat(cfg.maxWeight) || 250),
-          tray_length: lenNum > 100 ? lenNum / 1000 : lenNum,
-          tray_width: widthNum > 100 ? widthNum / 1000 : widthNum,
-          is_fixed_height: cfg.isFixedHeight,
-        };
-      });
+      const macroStorageTypes = (macroParams?.storageTypes ?? []) as Array<{
+        name?: string;
+        num_locations?: number;
+        max_w?: number;
+        max_l?: number;
+        is_variable_height?: boolean;
+        max_h_loc?: number;
+        max_h_storage?: number;
+        max_weight_loc?: number;
+        occupancy_pct?: number;
+        cycle_days?: number;
+        cycle_vol_limit?: number;
+        categories?: string[];
+      }>;
+
+      type StoragePayload = {
+        storage_type: string;
+        max_trays: number;
+        max_weight: number;
+        tray_length: number;
+        tray_width: number;
+        is_fixed_height: boolean;
+        max_w?: number;
+        max_l?: number;
+        max_weight_loc?: number;
+        max_h_loc?: number;
+        max_h_storage?: number;
+        is_variable_height?: boolean;
+      };
+
+      const storages: StoragePayload[] =
+        macroStorageTypes.length > 0
+          ? macroStorageTypes.map((st) => {
+              const name = String(st?.name ?? "").trim() || "VLM";
+              const maxW = Number(st?.max_w ?? 1) || 1;
+              const maxL = Number(st?.max_l ?? 1) || 1;
+              const maxWeight = Number(st?.max_weight_loc ?? 250) || 250;
+              const numLoc = Math.max(1, Number(st?.num_locations ?? 100) || 100);
+              const isVarH = Boolean(st?.is_variable_height ?? false);
+              return {
+                storage_type: name,
+                max_trays: numLoc,
+                max_weight: maxWeight,
+                tray_length: maxL,
+                tray_width: maxW,
+                is_fixed_height: !isVarH,
+                max_w: maxW,
+                max_l: maxL,
+                max_weight_loc: maxWeight,
+                max_h_loc: Number(st?.max_h_loc ?? 0.5) || 0.5,
+                max_h_storage: Number(st?.max_h_storage ?? 5) || 5,
+                is_variable_height: isVarH,
+              };
+            })
+          : storageTypeList.map((st) => ({
+              storage_type: st,
+              max_trays: 100,
+              max_weight: 250,
+              tray_length: 1,
+              tray_width: 1,
+              is_fixed_height: false,
+            }));
 
       const sku_storage_mapping: Record<string, string> = {};
       if (macroResult?.macro_skus) {
@@ -233,6 +232,11 @@ export function Step4MicroSlotting() {
         });
       }
 
+      const firstMacroStorage = macroStorageTypes[0];
+      const cycleDays = firstMacroStorage?.cycle_days != null
+        ? Number(firstMacroStorage.cycle_days)
+        : Number(state.coverageDays) || 15;
+
       const payload = {
         storages,
         sku_storage_mapping,
@@ -241,7 +245,7 @@ export function Step4MicroSlotting() {
           rotation: weights.rotation / 100,
           height: weights.height / 100,
         },
-        cycle_days: Number(state.coverageDays) || 15,
+        cycle_days: cycleDays,
         include_zero_rot: state.includeNoRotation,
         optimize_trays: true,
         opt_time_ms: 2000,
@@ -471,130 +475,18 @@ export function Step4MicroSlotting() {
         </Card>
       )}
 
-      {/* Parámetros principales */}
+      {/* Configuración Avanzada de Pesos */}
       <Card>
         <div className="px-5 py-4 border-b">
           <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Settings2 className="w-4 h-4 text-kpi-icon" /> Parámetros
+            <Settings2 className="w-4 h-4 text-kpi-icon" /> Configuración Avanzada de Pesos
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Días de cobertura, hardware y dimensiones</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Los pesos definen cómo el algoritmo prioriza Afinidad, Rotación y Altura al agrupar SKUs en bandejas. La suma debe ser exactamente 100%.
+          </p>
         </div>
         <CardContent className="py-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Días de Cobertura (cycle days)</Label>
-              <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15) })} />
-            </div>
-          </div>
-
-          {storageTypeList.length === 0 && hasMacroResults && (
-            <p className="text-xs text-amber-600 mt-3">No se detectaron tipos de almacenamiento en macro_skus.</p>
-          )}
-
-          {storageTypeList.length > 0 && (
-            <Accordion type="single" collapsible defaultValue="storage-0" className="mt-5 border rounded-lg bg-muted/30">
-              {storageTypeList.map((st, idx) => {
-                const cfg = storageConfigs[st] ?? DEFAULT_STORAGE_CONFIG;
-                return (
-                  <AccordionItem key={st} value={`storage-${idx}`} className="border-none">
-                    <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
-                      Configuración: {st}
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4 pt-0">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Bandejas máx</Label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            value={cfg.maxTrays}
-                            onChange={(e) =>
-                              setStorageConfigs((prev) => ({
-                                ...prev,
-                                [st]: { ...prev[st], maxTrays: e.target.value },
-                              }))
-                            }
-                            placeholder="100"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Peso Máximo (kg)</Label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            value={cfg.maxWeight}
-                            onChange={(e) =>
-                              setStorageConfigs((prev) => ({
-                                ...prev,
-                                [st]: { ...prev[st], maxWeight: e.target.value },
-                              }))
-                            }
-                            placeholder="250"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Largo (mm)</Label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            value={cfg.trayLength}
-                            onChange={(e) =>
-                              setStorageConfigs((prev) => ({
-                                ...prev,
-                                [st]: { ...prev[st], trayLength: e.target.value },
-                              }))
-                            }
-                            placeholder="2400"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs">Ancho (mm)</Label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            value={cfg.trayWidth}
-                            onChange={(e) =>
-                              setStorageConfigs((prev) => ({
-                                ...prev,
-                                [st]: { ...prev[st], trayWidth: e.target.value },
-                              }))
-                            }
-                            placeholder="800"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-4">
-                        <Switch
-                          id={`fixed-height-${st}`}
-                          checked={cfg.isFixedHeight}
-                          onCheckedChange={(checked) =>
-                            setStorageConfigs((prev) => ({
-                              ...prev,
-                              [st]: { ...prev[st], isFixedHeight: checked },
-                            }))
-                          }
-                        />
-                        <Label htmlFor={`fixed-height-${st}`} className="text-xs cursor-pointer">
-                          ¿Altura Fija? (Ignorar optimización de alturas)
-                        </Label>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          )}
-
-          <Accordion type="single" collapsible className="mt-5 border rounded-lg bg-muted/30">
-            <AccordionItem value="weights" className="border-none">
-              <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline">
-                Configuración Avanzada de Pesos
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 pt-0">
-                <p className="text-xs text-muted-foreground mb-4">
-                  Los pesos definen cómo el algoritmo prioriza Afinidad, Rotación y Altura al agrupar SKUs en bandejas. La suma debe ser exactamente 100%.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Afinidad (%) — Co-ocurrencia en pedidos</Label>
                     <Input
@@ -626,14 +518,11 @@ export function Step4MicroSlotting() {
                     />
                   </div>
                 </div>
-                {!weightsValid && (
-                  <p className="text-sm text-red-600 font-medium mt-3">
-                    La suma debe ser 100%. Actual: {weightsSum}%
-                  </p>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          {!weightsValid && (
+            <p className="text-sm text-red-600 font-medium mt-3 col-span-full">
+              La suma debe ser 100%. Actual: {weightsSum}%
+            </p>
+          )}
         </CardContent>
       </Card>
 
