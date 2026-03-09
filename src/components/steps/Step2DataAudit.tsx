@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSlotting } from "@/context/SlottingContext";
 import type { AuditResultsRaw, OutlierSkuItem, OutlierOrderItem, OutlierUbiquitousItem, DataValidationRaw } from "@/context/SlottingContext";
-import { ArrowRight, ArrowLeft, Zap, Download, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, Zap, Download, ChevronDown, Plus, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -369,9 +369,16 @@ export function Step2DataAudit() {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Detección de Anomalías</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1 mb-4">
             Identifique outliers y SKUs atípicos antes de ejecutar el slotting.
           </p>
+          <Alert className="bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800/50">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle className="font-semibold">Disclaimer de Auditoría</AlertTitle>
+            <AlertDescription className="text-xs mt-1">
+              Esta auditoría no garantiza la detección del 100% de las inconsistencias en la información cargada, es una guía para facilitar el análisis por parte del responsable del proceso.
+            </AlertDescription>
+          </Alert>
         </div>
         <Button onClick={handleRunAudit} disabled={isLoading} className="gap-2" size="lg">
           <Zap className="w-4 h-4" />
@@ -509,6 +516,26 @@ export function Step2DataAudit() {
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="ml-3 text-sm text-muted-foreground">Procesando auditoría de datos...</p>
+        </div>
+      )}
+
+      {hasResults && auditResults?.summary && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 animate-slide-in mb-6">
+          {[
+            { label: "Total SKUs", value: (auditResults.summary as Record<string, unknown>).total_skus?.toLocaleString() },
+            { label: "Total Pedidos", value: (auditResults.summary as Record<string, unknown>).total_pedidos?.toLocaleString() },
+            { label: "Total Unidades", value: (auditResults.summary as Record<string, unknown>).total_unidades?.toLocaleString() },
+            { label: "Total Líneas", value: (auditResults.summary as Record<string, unknown>).total_lineas?.toLocaleString() },
+            { label: "Líneas / Pedido", value: (auditResults.summary as Record<string, unknown>).lineas_por_pedido },
+            { label: "Total KG", value: `${(auditResults.summary as Record<string, unknown>).total_kg?.toLocaleString()} kg` },
+          ].map((stat, i) => (
+            <Card key={i} className="border bg-slate-50/50 dark:bg-slate-800/50">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <p className="text-xs text-muted-foreground font-medium mb-1">{stat.label}</p>
+                <p className="text-xl font-bold tracking-tight">{stat.value}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
