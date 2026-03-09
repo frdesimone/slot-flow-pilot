@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSlotting, type MacroResult } from "@/context/SlottingContext";
 import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,6 +138,7 @@ export function Step3MacroSlotting() {
     return [ensureStorageType({ ...defaultStorage })];
   });
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isDragEnabled, setIsDragEnabled] = useState(false);
 
   useEffect(() => {
     setMacroParams((prev) => ({ ...prev, storageTypes }));
@@ -441,7 +442,7 @@ export function Step3MacroSlotting() {
       </div>
 
       {/* Configuration */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-2">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
@@ -457,86 +458,96 @@ export function Step3MacroSlotting() {
           return (
             <Card
               key={idx}
-              draggable={true}
-              onDragStart={() => setDraggedIndex(idx)}
+              draggable={isDragEnabled}
+              onDragStart={(e) => {
+                const target = e.target as HTMLElement;
+                if (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) {
+                  e.preventDefault();
+                  return;
+                }
+                setDraggedIndex(idx);
+              }}
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => handleDrop(idx)}
               onDragEnd={() => setDraggedIndex(null)}
-              className={cn("transition-opacity", draggedIndex === idx ? "opacity-50" : "opacity-100")}
+              className={cn("mb-2 transition-opacity", draggedIndex === idx ? "opacity-50" : "opacity-100")}
             >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing" />
-                    <Badge variant="secondary" className="text-xs font-normal">
-                      Prioridad {idx + 1}
-                    </Badge>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs">Nombre del Equipo</Label>
-                    <Input
-                      value={safe.name}
-                      onChange={(e) => updateStorageType(idx, "name", e.target.value)}
-                      className="h-11 mt-1"
-                    />
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-9 w-9 shrink-0"
-                    onClick={() => removeStorageType(idx)}
-                    disabled={(storageTypes ?? []).length <= 1}
-                  >
-                    <Trash2 className="w-4 h-4 text-muted-foreground" />
-                  </Button>
+              <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2 shrink-0">
+                  <GripVertical
+                    className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
+                    onMouseEnter={() => setIsDragEnabled(true)}
+                    onMouseLeave={() => setIsDragEnabled(false)}
+                  />
+                  <Badge variant="secondary" className="text-[10px] font-normal">
+                    Prioridad {idx + 1}
+                  </Badge>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Cantidad de Ubicaciones</Label>
+                <div className="flex-1 min-w-0 mx-2">
+                  <Label className="text-[11px] uppercase text-muted-foreground truncate block">Nombre</Label>
+                  <Input
+                    value={safe.name}
+                    onChange={(e) => updateStorageType(idx, "name", e.target.value)}
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => removeStorageType(idx)}
+                  disabled={(storageTypes ?? []).length <= 1}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-2 items-end">
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Ubicaciones</Label>
                     <Input
                       type="number"
                       min={1}
                       value={safe.num_locations}
                       onChange={(e) => updateStorageType(idx, "num_locations", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Ancho Máx (m)</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Ancho (m)</Label>
                     <Input
                       type="number"
                       step={0.01}
                       min={0}
                       value={safe.max_w}
                       onChange={(e) => updateStorageType(idx, "max_w", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Largo Máx (m)</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Largo (m)</Label>
                     <Input
                       type="number"
                       step={0.01}
                       min={0}
                       value={safe.max_l}
                       onChange={(e) => updateStorageType(idx, "max_l", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Peso Máx/Ubicación (kg)</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Peso máx (kg)</Label>
                     <Input
                       type="number"
                       step={0.1}
                       min={0}
                       value={safe.max_weight_loc}
                       onChange={(e) => updateStorageType(idx, "max_weight_loc", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">% Ocupación</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">% Ocupación</Label>
                     <Input
                       type="number"
                       min={0}
@@ -544,73 +555,73 @@ export function Step3MacroSlotting() {
                       step={1}
                       value={safe.occupancy_pct}
                       onChange={(e) => updateStorageType(idx, "occupancy_pct", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Cycle Days</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Cycle Days</Label>
                     <Input
                       type="number"
                       min={1}
                       value={safe.cycle_days}
                       onChange={(e) => updateStorageType(idx, "cycle_days", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Vol Límite Ciclo</Label>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Vol límite</Label>
                     <Input
                       type="number"
                       step={0.01}
                       min={0}
                       value={safe.cycle_vol_limit}
                       onChange={(e) => updateStorageType(idx, "cycle_vol_limit", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                      className="h-11"
+                      className="h-9 text-sm"
                     />
                   </div>
-                  <div className="flex items-center gap-2 sm:col-span-2">
+                  <div className="flex flex-row items-center justify-between border rounded-md px-2 h-11 col-span-2 md:col-span-1">
+                    <span className="text-[11px] uppercase text-muted-foreground truncate">Altura Variable</span>
                     <Switch
                       checked={safe.is_variable_height}
                       onCheckedChange={(v) => updateStorageType(idx, "is_variable_height", v)}
                     />
-                    <Label className="text-xs">Altura Variable</Label>
                   </div>
                   {!safe.is_variable_height ? (
-                    <div className="space-y-2">
-                      <Label className="text-xs">Alto Máx Ubicación (m)</Label>
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-[11px] uppercase text-muted-foreground truncate">Alto Ubic. (m)</Label>
                       <Input
                         type="number"
                         step={0.01}
                         min={0}
                         value={safe.max_h_loc}
                         onChange={(e) => updateStorageType(idx, "max_h_loc", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                        className="h-11"
+                        className="h-9 text-sm"
                       />
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      <Label className="text-xs">Alto Total Equipo (m)</Label>
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-[11px] uppercase text-muted-foreground truncate">Alto Equipo (m)</Label>
                       <Input
                         type="number"
                         step={0.01}
                         min={0}
                         value={safe.max_h_storage}
                         onChange={(e) => updateStorageType(idx, "max_h_storage", e.target.value === "" ? "" : Number(e.target.value) || 0)}
-                        className="h-11"
+                        className="h-9 text-sm"
                       />
                     </div>
                   )}
-                  <div className="space-y-2 sm:col-span-3">
-                    <Label className="text-xs">Categorías Permitidas</Label>
+                  <div className="flex flex-col gap-0.5 col-span-2 md:col-span-2 lg:col-span-1">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Categorías</Label>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="w-full justify-between h-11 text-left font-normal">
+                        <Button variant="outline" className="h-9 justify-between text-left font-normal text-sm">
                           <span className="truncate">
                             {safe.categories && safe.categories.length > 0
                               ? safe.categories.join(", ")
-                              : "Todas (por defecto)"}
+                              : "Todas"}
                           </span>
-                          <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                          <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto" align="start">
