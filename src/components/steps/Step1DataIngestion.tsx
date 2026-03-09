@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import { FileSpreadsheet, CheckCircle2, ArrowRight } from "lucide-react";
+import { FileSpreadsheet, CheckCircle2, ArrowRight, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useToast } from "@/components/ui/use-toast";
 
 function DropZone({
   title,
@@ -109,6 +110,37 @@ function DropZone({
 
 export function Step1DataIngestion() {
   const { state, updateState, completeStep, setStep, setDataFile, setMappingConfig } = useSlotting();
+  const { toast } = useToast();
+
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state.mappingConfig),
+      });
+
+      if (!response.ok) throw new Error("Error al descargar template");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "template_slotting.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Template descargado", description: "El archivo template_slotting.xlsx se ha descargado correctamente." });
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error al descargar",
+        description: error instanceof Error ? error.message : "No se pudo descargar el template.",
+        variant: "destructive",
+      });
+    }
+  }, [state.mappingConfig, toast]);
 
   const handleFileSelect = useCallback(
     (file: File) => {
@@ -122,23 +154,32 @@ export function Step1DataIngestion() {
 
   return (
     <div className="space-y-8 pb-20">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Carga de Dataset de Slotting</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Suba un único archivo Excel con las hojas de Maestro y Pedidos para iniciar el análisis.
-        </p>
-      </div>
-
-      <DropZone
-        title="Dataset de Slotting (Excel único)"
-        subtitle="Un libro Excel con hojas de Maestro de Materiales e Historial de Pedidos"
-        formats="Excel (.xlsx, .xls)"
-        icon={FileSpreadsheet}
-        file={state.dataFile}
-        onFileSelect={handleFileSelect}
-        accept=".xlsx,.xls"
-        large
-      />
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle>Ingreso de Datos</CardTitle>
+            <CardDescription>
+              Sube tus archivos o conéctate a la base de datos para comenzar.
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+            <Download className="mr-2 h-4 w-4" />
+            Descargar template
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <DropZone
+            title="Dataset de Slotting (Excel único)"
+            subtitle="Un libro Excel con hojas de Maestro de Materiales e Historial de Pedidos"
+            formats="Excel (.xlsx, .xls)"
+            icon={FileSpreadsheet}
+            file={state.dataFile}
+            onFileSelect={handleFileSelect}
+            accept=".xlsx,.xls"
+            large
+          />
+        </CardContent>
+      </Card>
 
       <Accordion type="single" collapsible className="border rounded-xl bg-card/60 shadow-sm">
         <AccordionItem value="mapping" className="border-none">
@@ -191,15 +232,7 @@ export function Step1DataIngestion() {
                       className="h-8 text-xs"
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Volumen (col_volumen)</Label>
-                      <Input
-                        value={state.mappingConfig.col_volumen}
-                        onChange={(e) => setMappingConfig({ col_volumen: e.target.value })}
-                        className="h-8 text-xs"
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label className="text-xs">Peso (col_peso)</Label>
                       <Input

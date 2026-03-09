@@ -3,7 +3,7 @@ import { useSlotting } from "@/context/SlottingContext";
 import { Check, Database, Search, Layers3, LayoutGrid, Clock } from "lucide-react";
 
 const steps = [
-  { label: "Ingesta de Datos", sublabel: "Carga de Maestro y Transacciones", icon: Database },
+  { label: "Ingreso de Datos", sublabel: "Carga de Maestro y Transacciones", icon: Database },
   { label: "Auditoría de Datos", sublabel: "Detección de Anomalías", icon: Search },
   { label: "Macro-Slotting", sublabel: "Perfilado y Asignación", icon: Layers3 },
   { label: "Micro-Slotting", sublabel: "Distribución Física", icon: LayoutGrid },
