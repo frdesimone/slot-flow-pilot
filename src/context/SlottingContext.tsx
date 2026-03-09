@@ -115,13 +115,43 @@ export interface BestTrayItem {
   items: { sku: string; vol: number; description?: string; boxes?: number }[];
 }
 
+/** Ubicación del nuevo formato locations: location_id, metrics, items con peso/superficie/volumen */
+export interface LocationItem {
+  sku: string;
+  description: string;
+  weight: number;
+  surface: number;
+  volume: number;
+  replenishment_units: number;
+}
+
+export interface MicroLocation {
+  location_id: string;
+  occupancy_pct?: number;
+  max_height?: number;
+  wasted_vol?: number;
+  metrics: {
+    used_weight: number;
+    max_weight: number;
+    used_surface: number;
+    max_surface: number;
+    used_volume: number;
+    max_volume: number;
+  };
+  items: LocationItem[];
+}
+
 export interface MicroResult {
   vlmCount?: number;
   traysPerVLM?: TrayData[][];
   /** Nuevo formato: array de bandejas desde data.best_trays */
   best_trays?: BestTrayItem[];
   /** Resultados por tipo de almacenamiento (VLM, Jaula, etc.) */
-  results_by_storage?: Record<string, { kpi: Record<string, unknown>; best_trays: BestTrayItem[] }>;
+  results_by_storage?: Record<string, {
+    kpi: Record<string, unknown>;
+    best_trays: BestTrayItem[];
+    locations?: MicroLocation[];
+  }>;
   heightEfficiency?: number;
   areaEfficiency?: number;
   avgTraysPerOrder?: number;

@@ -1,19 +1,17 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSlotting } from "@/context/SlottingContext";
-import type { BestTrayItem } from "@/context/SlottingContext";
-import { ArrowLeft, Play, Settings2, Download, AlertTriangle, Package, Maximize2 } from "lucide-react";
+import type { MicroLocation } from "@/context/SlottingContext";
+import { ArrowLeft, Play, Settings2, Download, AlertTriangle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
@@ -80,27 +78,40 @@ const DEFAULT_STORAGE_CONFIG: StorageConfigForm = {
   isFixedHeight: false,
 };
 
-function downloadMicroCSV(bestTrays: BestTrayItem[] | undefined | null) {
-  const trays = bestTrays ?? [];
-  const rows: string[][] = [["Tray ID", "Occupancy %", "Item Count", "SKU", "Vol"]];
-  trays.forEach((tray) => {
-    const items = tray?.items ?? [];
+function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
+  const locs = locations ?? [];
+  const rows: string[][] = [
+    ["Location ID", "Peso (kg)", "Superficie (m²)", "Volumen (m³)", "SKU", "Descripción", "Peso (KG)", "Superficie (m²)", "Volumen (m³)", "Unid. Reposición"],
+  ];
+  locs.forEach((loc) => {
+    const items = loc?.items ?? [];
+    const m = loc?.metrics ?? { used_weight: 0, max_weight: 0, used_surface: 0, max_surface: 0, used_volume: 0, max_volume: 0 };
     if (items.length === 0) {
       rows.push([
-        String(tray?.tray_id ?? ""),
-        String(tray?.occupancy_pct ?? 0),
-        String(tray?.item_count ?? 0),
+        String(loc?.location_id ?? ""),
+        `${m.used_weight}/${m.max_weight}`,
+        `${m.used_surface}/${m.max_surface}`,
+        `${m.used_volume}/${m.max_volume}`,
+        "",
+        "",
+        "",
+        "",
         "",
         "",
       ]);
     } else {
       items.forEach((item, idx) => {
         rows.push([
-          idx === 0 ? String(tray?.tray_id ?? "") : "",
-          idx === 0 ? String(tray?.occupancy_pct ?? 0) : "",
-          idx === 0 ? String(tray?.item_count ?? 0) : "",
+          idx === 0 ? String(loc?.location_id ?? "") : "",
+          idx === 0 ? `${m.used_weight}/${m.max_weight}` : "",
+          idx === 0 ? `${m.used_surface}/${m.max_surface}` : "",
+          idx === 0 ? `${m.used_volume}/${m.max_volume}` : "",
           String(item?.sku ?? ""),
-          String(item?.vol ?? 0),
+          String(item?.description ?? ""),
+          String(item?.weight ?? ""),
+          String(item?.surface ?? ""),
+          String(item?.volume ?? ""),
+          String(item?.replenishment_units ?? ""),
         ]);
       });
     }
@@ -113,12 +124,6 @@ function downloadMicroCSV(bestTrays: BestTrayItem[] | undefined | null) {
   a.download = `micro_slotting_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function getOccupancyBadgeClass(pct: number): string {
-  if (pct > 80) return "bg-emerald-500/90 text-white border-emerald-600";
-  if (pct > 50) return "bg-amber-500/90 text-white border-amber-600";
-  return "bg-red-500/90 text-white border-red-600";
 }
 
 export function Step4MicroSlotting() {
@@ -338,7 +343,6 @@ export function Step4MicroSlotting() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("occupancy_desc");
   const [activeStorageTab, setActiveStorageTab] = useState("");
-  const [selectedTray, setSelectedTray] = useState<BestTrayItem | null>(null);
 
   const resultsByStorage = useMemo(() => {
     const rbs = micro?.results_by_storage;
@@ -365,16 +369,23 @@ export function Step4MicroSlotting() {
     }
   }, [storageTabKeys.join(","), activeStorageTab]);
 
-  const traysForActiveTab = resultsByStorage[effectiveActiveTab]?.best_trays ?? [];
+  const locationsForActiveTab: MicroLocation[] = useMemo(() => {
+    const r = resultsByStorage[effectiveActiveTab];
+    const locs = r?.locations ?? r?.best_trays;
+    if (Array.isArray(locs) && locs.length > 0) {
+      return locs as MicroLocation[];
+    }
+    return [];
+  }, [resultsByStorage, effectiveActiveTab]);
 
-  const filteredAndSortedTrays = useMemo(() => {
-    let list = [...traysForActiveTab];
+  const filteredAndSortedLocations = useMemo(() => {
+    let list = [...locationsForActiveTab];
     const term = (searchTerm ?? "").trim().toLowerCase();
     if (term) {
-      list = list.filter((t) => {
-        const trayId = String(t?.tray_id ?? "").toLowerCase();
-        if (trayId.includes(term)) return true;
-        const items = t?.items ?? [];
+      list = list.filter((loc) => {
+        const locId = String(loc?.location_id ?? "").toLowerCase();
+        if (locId.includes(term)) return true;
+        const items = loc?.items ?? [];
         return items.some((it) => {
           const sku = String(it?.sku ?? "").toLowerCase();
           const desc = String(it?.description ?? "").toLowerCase();
@@ -387,19 +398,19 @@ export function Step4MicroSlotting() {
     } else if (sortBy === "occupancy_asc") {
       list.sort((a, b) => (Number(a?.occupancy_pct ?? 0) - Number(b?.occupancy_pct ?? 0)));
     } else if (sortBy === "items_desc") {
-      list.sort((a, b) => (Number(b?.item_count ?? 0) - Number(a?.item_count ?? 0)));
+      list.sort((a, b) => ((b?.items?.length ?? 0) - (a?.items?.length ?? 0)));
     }
     return list;
-  }, [traysForActiveTab, searchTerm, sortBy]);
+  }, [locationsForActiveTab, searchTerm, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredAndSortedTrays.length / itemsPerPage));
-  const paginatedTrays = useMemo(() => {
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedLocations.length / itemsPerPage));
+  const paginatedLocations = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedTrays.slice(start, start + itemsPerPage);
-  }, [filteredAndSortedTrays, currentPage, itemsPerPage]);
+    return filteredAndSortedLocations.slice(start, start + itemsPerPage);
+  }, [filteredAndSortedLocations, currentPage, itemsPerPage]);
 
   const paginationStart = (currentPage - 1) * itemsPerPage + 1;
-  const paginationEnd = Math.min(currentPage * itemsPerPage, filteredAndSortedTrays.length);
+  const paginationEnd = Math.min(currentPage * itemsPerPage, filteredAndSortedLocations.length);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -652,7 +663,7 @@ export function Step4MicroSlotting() {
                 <TabsTrigger key={st} value={st} className="gap-1">
                   {st}
                   <Badge variant="secondary" className="text-[10px]">
-                    {resultsByStorage[st]?.best_trays?.length ?? 0}
+                    {(resultsByStorage[st]?.locations ?? resultsByStorage[st]?.best_trays ?? []).length}
                   </Badge>
                 </TabsTrigger>
               ))}
@@ -673,17 +684,21 @@ export function Step4MicroSlotting() {
                   </div>
                 </div>
 
-                {/* Grilla de bandejas */}
+                {/* Ubicaciones y Tablas */}
                 <Card>
                   <div className="px-5 py-3 border-b flex flex-wrap items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <Package className="w-4 h-4" /> Bandejas Asignadas — {st}
+                      <Package className="w-4 h-4" /> Ubicaciones Asignadas — {st}
                     </h3>
                     <Button
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      onClick={() => downloadMicroCSV(resultsByStorage[st]?.best_trays)}
+                      onClick={() =>
+                        downloadMicroCSV(
+                          (resultsByStorage[st]?.locations ?? resultsByStorage[st]?.best_trays ?? []) as MicroLocation[],
+                        )
+                      }
                     >
                       <Download className="w-4 h-4" />
                       Exportar a CSV
@@ -691,7 +706,7 @@ export function Step4MicroSlotting() {
                   </div>
                   <div className="px-5 py-3 border-b grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                     <Input
-                      placeholder="Buscar por ID de bandeja o SKU"
+                      placeholder="Buscar por ID de ubicación o SKU"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full"
@@ -708,70 +723,79 @@ export function Step4MicroSlotting() {
                     </Select>
                   </div>
                   <CardContent className="p-5">
-                    {st !== effectiveActiveTab ? null : (resultsByStorage[st]?.best_trays?.length ?? 0) === 0 ? (
+                    {st !== effectiveActiveTab ? null : locationsForActiveTab.length === 0 ? (
                       <div className="py-12 text-center text-muted-foreground">
                         <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                        <p className="text-sm font-medium">No hay bandejas para mostrar</p>
-                        <p className="text-xs mt-1">El backend no devolvió bandejas o la lista está vacía.</p>
+                        <p className="text-sm font-medium">No hay ubicaciones para mostrar</p>
+                        <p className="text-xs mt-1">El backend no devolvió ubicaciones o la lista está vacía.</p>
                       </div>
-                    ) : filteredAndSortedTrays.length === 0 ? (
+                    ) : filteredAndSortedLocations.length === 0 ? (
                       <div className="py-12 text-center text-muted-foreground">
                         <p className="text-sm font-medium">Sin resultados para la búsqueda</p>
                         <p className="text-xs mt-1">Prueba con otro término o limpia el filtro.</p>
                       </div>
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                          {paginatedTrays.map((tray, idx) => {
-                            const pct = Number(tray?.occupancy_pct ?? 0);
-                            const itemCount = Number(tray?.item_count ?? 0);
-                            const items = tray?.items ?? [];
+                        <div className="space-y-6">
+                          {paginatedLocations.map((location, idx) => {
+                            const m = location?.metrics ?? {
+                              used_weight: 0,
+                              max_weight: 0,
+                              used_surface: 0,
+                              max_surface: 0,
+                              used_volume: 0,
+                              max_volume: 0,
+                            };
+                            const items = location?.items ?? [];
                             return (
-                              <Card key={tray?.tray_id ?? idx} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
-                                <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
-                                  <div className="flex items-center justify-between gap-2 min-w-0 flex-1">
-                                    <CardTitle className="text-sm font-bold truncate" title={tray?.tray_id}>
-                                      {tray?.tray_id ?? `Bandeja ${idx + 1}`}
+                              <Card key={location?.location_id ?? idx} className="mb-6 overflow-hidden">
+                                <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b">
+                                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <CardTitle className="text-lg">
+                                      Ubicación: {location?.location_id ?? `Loc-${idx + 1}`}
                                     </CardTitle>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <Badge className={`text-[10px] font-medium ${getOccupancyBadgeClass(pct)}`}>
-                                        {pct.toFixed(1)}%
+                                    <div className="flex flex-wrap gap-3">
+                                      <Badge
+                                        variant={
+                                          m.used_weight > m.max_weight && m.max_weight > 0 ? "destructive" : "secondary"
+                                        }
+                                      >
+                                        Peso: {m.used_weight} / {m.max_weight} kg
                                       </Badge>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedTray(tray)}>
-                                        <Maximize2 className="h-4 w-4" />
-                                      </Button>
+                                      <Badge variant="secondary">
+                                        Superficie: {m.used_surface} / {m.max_surface} m²
+                                      </Badge>
+                                      <Badge variant="secondary">
+                                        Volumen: {m.used_volume} / {m.max_volume} m³
+                                      </Badge>
                                     </div>
                                   </div>
                                 </CardHeader>
-                                <CardContent className="px-4 pb-4 pt-0">
-                                  <p className="text-xs text-muted-foreground mb-1">
-                                    Altura Estante: {((tray?.max_height ?? 0) * 1000).toFixed(0)} mm | Aire: {(tray?.wasted_vol ?? 0).toFixed(4)} m³
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mb-2">
-                                    Items en bandeja: <strong>{itemCount}</strong>
-                                  </p>
-                                  <ScrollArea className="h-32 rounded-md border">
-                                    <ul className="p-2 space-y-1.5 text-xs">
-                                      {items.map((item, i) => {
-                                        const sku = item?.sku ?? "-";
-                                        const desc = item?.description ?? "";
-                                        const vol = Number(item?.vol ?? 0);
-                                        const boxes = Number(item?.boxes ?? 0);
-                                        const mainText = desc ? `${sku} - ${desc}` : sku;
-                                        return (
-                                          <li key={`${item?.sku ?? i}-${i}`} className="truncate">
-                                            <span className="font-mono block truncate" title={mainText}>
-                                              {mainText}
-                                            </span>
-                                            <span className="text-muted-foreground text-[10px] block truncate">
-                                              Vol: {vol.toFixed(4)} m³ | Cajas: {boxes.toFixed(2)}
-                                              {typeof item?.height === "number" ? ` | Alto: ${(item.height * 1000).toFixed(0)} mm` : ""}
-                                            </span>
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  </ScrollArea>
+                                <CardContent className="p-0">
+                                  <Table>
+                                    <TableHeader className="bg-muted/50">
+                                      <TableRow>
+                                        <TableHead>SKU</TableHead>
+                                        <TableHead>Descripción</TableHead>
+                                        <TableHead className="text-right">Peso (KG)</TableHead>
+                                        <TableHead className="text-right">Superficie (m²)</TableHead>
+                                        <TableHead className="text-right">Volumen (m³)</TableHead>
+                                        <TableHead className="text-right">Unid. Reposición</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {items.map((item, itemIdx) => (
+                                        <TableRow key={`${item?.sku ?? ""}-${itemIdx}`}>
+                                          <TableCell className="font-medium">{item?.sku ?? "-"}</TableCell>
+                                          <TableCell>{item?.description ?? ""}</TableCell>
+                                          <TableCell className="text-right">{item?.weight ?? "-"}</TableCell>
+                                          <TableCell className="text-right">{item?.surface ?? "-"}</TableCell>
+                                          <TableCell className="text-right">{item?.volume ?? "-"}</TableCell>
+                                          <TableCell className="text-right">{item?.replenishment_units ?? "-"}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
                                 </CardContent>
                               </Card>
                             );
@@ -779,7 +803,8 @@ export function Step4MicroSlotting() {
                         </div>
                         <div className="mt-5 pt-4 border-t flex items-center justify-between gap-4 flex-wrap">
                           <p className="text-sm text-muted-foreground">
-                            Mostrando {paginationStart} a {paginationEnd} de {filteredAndSortedTrays.length} bandejas
+                            Mostrando {paginationStart} a {paginationEnd} de {filteredAndSortedLocations.length}{" "}
+                            ubicaciones
                           </p>
                           <div className="flex items-center gap-2">
                             <Button
@@ -830,73 +855,6 @@ export function Step4MicroSlotting() {
         </Button>
       </div>
 
-      {/* Modal de Detalle de Bandeja */}
-      <Dialog open={!!selectedTray} onOpenChange={(open) => !open && setSelectedTray(null)}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Detalle de Bandeja: {selectedTray?.tray_id}</DialogTitle>
-            <DialogDescription>
-              Desglose completo de SKUs y métricas de espacio.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedTray && (
-            <>
-              {/* Panel de Estadísticas Destacadas */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/40 rounded-lg">
-                <div>
-                  <p className="text-sm text-muted-foreground">Ocupación</p>
-                  <p className="text-xl font-bold">{(selectedTray.occupancy_pct ?? 0).toFixed(2)}%</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Cantidad SKUs</p>
-                  <p className="text-xl font-bold">{selectedTray.item_count ?? 0}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Altura Estante</p>
-                  <p className="text-xl font-bold">{((selectedTray.max_height ?? 0) * 1000).toFixed(0)} mm</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Aire Desperdiciado</p>
-                  <p className="text-xl font-bold text-orange-600">{(selectedTray.wasted_vol ?? 0).toFixed(4)} m³</p>
-                </div>
-              </div>
-
-              {/* Tabla de SKUs */}
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Altura (mm)</TableHead>
-                      <TableHead className="text-right">Volumen (m³)</TableHead>
-                      <TableHead className="text-right">Cajas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(selectedTray.items ?? []).map((item: Record<string, unknown>, idx: number) => (
-                      <TableRow key={`${item.sku ?? ""}-${idx}`}>
-                        <TableCell className="font-medium">{String(item.sku ?? "-")}</TableCell>
-                        <TableCell>{String(item.description ?? "")}</TableCell>
-                        <TableCell className="text-right">
-                          {typeof item.height === "number" ? (item.height * 1000).toFixed(0) : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {typeof item.vol === "number" ? item.vol.toFixed(4) : "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {typeof item.boxes === "number" ? item.boxes.toFixed(2) : "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
