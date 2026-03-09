@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
@@ -15,14 +16,17 @@ import { cn } from "@/lib/utils";
 
 type MacroStorageType = {
   name: string;
-  priority: number | string;
+  num_locations: number | string;
+  max_w: number | string;
+  max_l: number | string;
+  is_variable_height: boolean;
+  max_h_loc: number | string;
+  max_h_storage: number | string;
+  max_weight_loc: number | string;
+  occupancy_pct: number | string;
   cycle_days: number | string;
-  max_volume: number | string;
-  max_weight: number | string;
-  capacity: number | string;
-  occupancy: number | string;
-  max_cycle_volume_limit: number | string;
-  allowed_categories: string;
+  cycle_vol_limit: number | string;
+  categories: string[];
 };
 
 type MacroSkuRow = {
@@ -36,32 +40,45 @@ type MacroSkuRow = {
   height?: number;
   width?: number;
   length?: number;
+  replenishment_units?: number;
+  total_vol?: number;
+  total_weight?: number;
 };
 
-const DEFAULT_STORAGE: MacroStorageType = {
-  name: "VLM",
-  priority: 1,
+const defaultStorage: MacroStorageType = {
+  name: "Nuevo Equipo",
+  num_locations: 10,
+  max_w: 1.0,
+  max_l: 1.0,
+  is_variable_height: false,
+  max_h_loc: 0.5,
+  max_h_storage: 5.0,
+  max_weight_loc: 250,
+  occupancy_pct: 85,
   cycle_days: 15,
-  max_volume: 0.1,
-  max_weight: 25,
-  capacity: 60,
-  occupancy: 0.85,
-  max_cycle_volume_limit: 999,
-  allowed_categories: "",
+  cycle_vol_limit: 100,
+  categories: [],
 };
 
-function ensureStorageType(st: Partial<MacroStorageType> | undefined): MacroStorageType {
-  if (!st || typeof st !== "object") return { ...DEFAULT_STORAGE };
+function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknown> | undefined): MacroStorageType {
+  if (!st || typeof st !== "object") return { ...defaultStorage };
+  const cats = st.categories;
+  const categories = Array.isArray(cats) ? [...cats] : typeof st.allowed_categories === "string"
+    ? (st.allowed_categories as string).split(",").map((c) => c.trim()).filter(Boolean)
+    : [];
   return {
-    name: String(st.name ?? DEFAULT_STORAGE.name),
-    priority: st.priority ?? DEFAULT_STORAGE.priority,
-    cycle_days: st.cycle_days ?? DEFAULT_STORAGE.cycle_days,
-    max_volume: st.max_volume ?? DEFAULT_STORAGE.max_volume,
-    max_weight: st.max_weight ?? DEFAULT_STORAGE.max_weight,
-    capacity: st.capacity ?? DEFAULT_STORAGE.capacity,
-    occupancy: st.occupancy ?? DEFAULT_STORAGE.occupancy,
-    max_cycle_volume_limit: st.max_cycle_volume_limit ?? DEFAULT_STORAGE.max_cycle_volume_limit,
-    allowed_categories: typeof st.allowed_categories === "string" ? st.allowed_categories : "",
+    name: String(st.name ?? defaultStorage.name),
+    num_locations: st.num_locations ?? defaultStorage.num_locations,
+    max_w: st.max_w ?? defaultStorage.max_w,
+    max_l: st.max_l ?? defaultStorage.max_l,
+    is_variable_height: Boolean(st.is_variable_height ?? defaultStorage.is_variable_height),
+    max_h_loc: st.max_h_loc ?? defaultStorage.max_h_loc,
+    max_h_storage: st.max_h_storage ?? defaultStorage.max_h_storage,
+    max_weight_loc: st.max_weight_loc ?? defaultStorage.max_weight_loc,
+    occupancy_pct: st.occupancy_pct ?? defaultStorage.occupancy_pct,
+    cycle_days: st.cycle_days ?? defaultStorage.cycle_days,
+    cycle_vol_limit: st.cycle_vol_limit ?? defaultStorage.cycle_vol_limit,
+    categories,
   };
 }
 
@@ -77,18 +94,16 @@ function extractId(obj: Record<string, unknown>): string | null {
 
 function downloadMacroCSV(rows: MacroSkuRow[] | undefined | null) {
   const safeRows = rows ?? [];
-  const headers = ["SKU", "Descripción", "Storage Type", "Vol. Ciclo", "Cajas de Ciclo", "Peso (kg)", "Categoría", "Alto (mm)", "Ancho (mm)", "Largo (mm)"];
+  const headers = ["SKU", "Descripción", "Storage Type", "Categoría", "Dimensiones (L x A x H)", "Unid. Reposición", "Vol. Total (m³)", "Peso Total (KG)"];
   const csvRows = safeRows.map((r) => [
     r?.sku_id ?? "",
     r?.description ?? "",
     r?.storage_type ?? "",
-    (Number(r?.vol_cycle) || 0).toFixed(4),
-    ((Number(r?.vol_cycle) || 0) * (Number(r?.boxes_per_m3) || 0)).toFixed(2),
-    (Number(r?.weight) || 0).toFixed(2),
     r?.category ?? "",
-    r?.height != null ? String(r.height) : "-",
-    r?.width != null ? String(r.width) : "-",
-    r?.length != null ? String(r.length) : "-",
+    [r?.length, r?.width, r?.height].map((v) => (v != null ? String(v) : "-")).join(" x "),
+    r?.replenishment_units != null ? Number(r.replenishment_units).toFixed(1) : "-",
+    r?.total_vol != null ? Number(r.total_vol).toFixed(4) : "-",
+    r?.total_weight != null ? Number(r.total_weight).toFixed(2) : "-",
   ]);
   const csv = [headers.join(","), ...csvRows.map((r) => r.map((c) => (String(c).includes(",") || String(c).includes('"') ? `"${String(c).replace(/"/g, '""')}"` : c)).join(","))].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
@@ -120,7 +135,7 @@ export function Step3MacroSlotting() {
     if (Array.isArray(saved) && saved.length > 0) {
       return saved.map((st) => ensureStorageType(st));
     }
-    return [ensureStorageType({ ...DEFAULT_STORAGE })];
+    return [ensureStorageType({ ...defaultStorage })];
   });
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -154,19 +169,23 @@ export function Step3MacroSlotting() {
       formData.append("excluded_skus", JSON.stringify(selectedSkus));
       formData.append("excluded_orders", JSON.stringify(selectedOrders));
 
-      // Tipos de almacenamiento dinámicos (prioridad = índice + 1)
+      // Tipos de almacenamiento paramétricos (prioridad = índice + 1)
       const safeStorageTypes = (storageTypes ?? []).map((st, idx) => {
         const safe = ensureStorageType(st);
         return {
           name: safe.name,
           priority: idx + 1,
+          num_locations: Number(safe.num_locations) || 10,
+          max_w: Number(safe.max_w) || 1.0,
+          max_l: Number(safe.max_l) || 1.0,
+          is_variable_height: Boolean(safe.is_variable_height),
+          max_h_loc: Number(safe.max_h_loc) || 0.5,
+          max_h_storage: Number(safe.max_h_storage) || 5.0,
+          max_weight_loc: Number(safe.max_weight_loc) || 250,
+          occupancy_pct: Number(safe.occupancy_pct) || 85,
           cycle_days: Number(safe.cycle_days) || 15,
-          max_volume: Number(safe.max_volume) || 0.1,
-          max_weight: Number(safe.max_weight) || 25,
-          capacity: Number(safe.capacity) || 60,
-          occupancy: Number(safe.occupancy) || 0.85,
-          max_cycle_volume_limit: Number(safe.max_cycle_volume_limit) || 999,
-          allowed_categories: safe.allowed_categories ?? "",
+          cycle_vol_limit: Number(safe.cycle_vol_limit) || 100,
+          categories: Array.isArray(safe.categories) ? safe.categories : [],
         };
       });
       formData.append("storage_types", JSON.stringify(safeStorageTypes));
@@ -219,24 +238,31 @@ export function Step3MacroSlotting() {
     setStorageTypes((prev) => [
       ...prev,
       ensureStorageType({
-        ...DEFAULT_STORAGE,
-        name: `Storage ${(prev?.length ?? 0) + 1}`,
-        priority: (prev?.length ?? 0) + 1,
+        ...defaultStorage,
+        name: `Equipo ${(prev?.length ?? 0) + 1}`,
       }),
     ]);
   };
 
-  const updateStorageType = (idx: number, field: keyof MacroStorageType, value: string | number) => {
+  const updateStorageType = (idx: number, field: keyof MacroStorageType, value: string | number | boolean | string[]) => {
     setStorageTypes((prev) => {
       const list = prev ?? [];
-      const next = [...list];
-      const current = ensureStorageType(next[idx]);
-      const parsed = (field === "allowed_categories" || field === "name")
-        ? String(value ?? "")
-        : (value === "" ? "" : (field === "cycle_days" || field === "priority" || field === "max_weight")
-          ? (typeof value === "number" ? value : parseInt(String(value), 10) || 0)
-          : (typeof value === "number" ? value : parseFloat(String(value)) || 0));
-      next[idx] = { ...current, [field]: parsed };
+      const next = list.map((s) => ensureStorageType(s));
+      const current = next[idx];
+      if (field === "name") {
+        next[idx] = { ...current, name: String(value ?? "") };
+      } else if (field === "categories") {
+        next[idx] = { ...current, categories: Array.isArray(value) ? value : [] };
+      } else if (field === "is_variable_height") {
+        next[idx] = { ...current, is_variable_height: Boolean(value) };
+      } else if (typeof value === "number" || value === "") {
+        next[idx] = { ...current, [field]: value };
+      } else {
+        const num = field === "cycle_days" || field === "num_locations"
+          ? parseInt(String(value), 10) || 0
+          : parseFloat(String(value)) || 0;
+        next[idx] = { ...current, [field]: num };
+      }
       return next;
     });
   };
@@ -287,6 +313,9 @@ export function Step3MacroSlotting() {
       height: r?.height != null ? Number(r.height) : undefined,
       width: r?.width != null ? Number(r.width) : undefined,
       length: r?.length != null ? Number(r.length) : undefined,
+      replenishment_units: r?.replenishment_units != null ? Number(r.replenishment_units) : undefined,
+      total_vol: r?.total_vol != null ? Number(r.total_vol) : undefined,
+      total_weight: r?.total_weight != null ? Number(r.total_weight) : undefined,
     }));
 
   useEffect(() => {
@@ -413,176 +442,208 @@ export function Step3MacroSlotting() {
 
       {/* Configuration */}
       <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
-              <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Cycle Days, Vol. Límite y Categorías por tipo.</p>
-            </div>
-            <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
-              <Plus className="w-3 h-3" /> Añadir
-            </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
+            <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Arrastrá para reordenar.</p>
           </div>
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">Prioridad</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead className="w-24">Cycle Days</TableHead>
-                  <TableHead className="w-24">Vol/SKU (m³)</TableHead>
-                  <TableHead className="w-24">Peso/SKU (kg)</TableHead>
-                  <TableHead className="w-24">Capacidad (m³)</TableHead>
-                  <TableHead className="w-28">Ocupación (0.01-1)</TableHead>
-                  <TableHead className="w-28">Vol. Límite Ciclo</TableHead>
-                  <TableHead className="min-w-[140px]">Categorías Permitidas</TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(storageTypes ?? []).map((st, idx) => {
-                  const safe = ensureStorageType(st);
-                  return (
-                  <TableRow
-                    key={idx}
-                    draggable={true}
-                    onDragStart={() => setDraggedIndex(idx)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => handleDrop(idx)}
-                    onDragEnd={() => setDraggedIndex(null)}
-                    className={cn("transition-opacity", draggedIndex === idx ? "opacity-50" : "opacity-100")}
+          <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
+            <Plus className="w-3 h-3" /> Añadir
+          </Button>
+        </div>
+
+        {(storageTypes ?? []).map((st, idx) => {
+          const safe = ensureStorageType(st);
+          return (
+            <Card
+              key={idx}
+              draggable={true}
+              onDragStart={() => setDraggedIndex(idx)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => handleDrop(idx)}
+              onDragEnd={() => setDraggedIndex(null)}
+              className={cn("transition-opacity", draggedIndex === idx ? "opacity-50" : "opacity-100")}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing" />
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      Prioridad {idx + 1}
+                    </Badge>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs">Nombre del Equipo</Label>
+                    <Input
+                      value={safe.name}
+                      onChange={(e) => updateStorageType(idx, "name", e.target.value)}
+                      className="h-11 mt-1"
+                    />
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => removeStorageType(idx)}
+                    disabled={(storageTypes ?? []).length <= 1}
                   >
-                    <TableCell className="w-20">
-                      <div className="flex items-center gap-2">
-                        <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          Prioridad {idx + 1}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={safe.name}
-                        onChange={(e) => updateStorageType(idx, "name", e.target.value)}
-                        className="h-8 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={safe.cycle_days}
-                        onChange={(e) => updateStorageType(idx, "cycle_days", e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15))}
-                        className="h-8 w-20 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
+                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Cantidad de Ubicaciones</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={safe.num_locations}
+                      onChange={(e) => updateStorageType(idx, "num_locations", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Ancho Máx (m)</Label>
+                    <Input
+                      type="number"
+                      step={0.01}
+                      min={0}
+                      value={safe.max_w}
+                      onChange={(e) => updateStorageType(idx, "max_w", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Largo Máx (m)</Label>
+                    <Input
+                      type="number"
+                      step={0.01}
+                      min={0}
+                      value={safe.max_l}
+                      onChange={(e) => updateStorageType(idx, "max_l", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Peso Máx/Ubicación (kg)</Label>
+                    <Input
+                      type="number"
+                      step={0.1}
+                      min={0}
+                      value={safe.max_weight_loc}
+                      onChange={(e) => updateStorageType(idx, "max_weight_loc", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">% Ocupación</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={safe.occupancy_pct}
+                      onChange={(e) => updateStorageType(idx, "occupancy_pct", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Cycle Days</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={safe.cycle_days}
+                      onChange={(e) => updateStorageType(idx, "cycle_days", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Vol Límite Ciclo</Label>
+                    <Input
+                      type="number"
+                      step={0.01}
+                      min={0}
+                      value={safe.cycle_vol_limit}
+                      onChange={(e) => updateStorageType(idx, "cycle_vol_limit", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 sm:col-span-2">
+                    <Switch
+                      checked={safe.is_variable_height}
+                      onCheckedChange={(v) => updateStorageType(idx, "is_variable_height", v)}
+                    />
+                    <Label className="text-xs">Altura Variable</Label>
+                  </div>
+                  {!safe.is_variable_height ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Alto Máx Ubicación (m)</Label>
                       <Input
                         type="number"
                         step={0.01}
-                        value={safe.max_volume}
-                        onChange={(e) => updateStorageType(idx, "max_volume", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
-                        className="h-8 text-xs"
+                        min={0}
+                        value={safe.max_h_loc}
+                        onChange={(e) => updateStorageType(idx, "max_h_loc", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                        className="h-11"
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={safe.max_weight}
-                        onChange={(e) => updateStorageType(idx, "max_weight", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
-                        className="h-8 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={safe.capacity}
-                        onChange={(e) => updateStorageType(idx, "capacity", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
-                        className="h-8 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={0.01}
-                        max={1}
-                        step={0.01}
-                        value={safe.occupancy}
-                        onChange={(e) => updateStorageType(idx, "occupancy", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0.85))}
-                        className="h-8 text-xs"
-                      />
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Alto Total Equipo (m)</Label>
                       <Input
                         type="number"
                         step={0.01}
-                        value={safe.max_cycle_volume_limit}
-                        onChange={(e) => updateStorageType(idx, "max_cycle_volume_limit", e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
-                        className="h-8 text-xs"
+                        min={0}
+                        value={safe.max_h_storage}
+                        onChange={(e) => updateStorageType(idx, "max_h_storage", e.target.value === "" ? "" : Number(e.target.value) || 0)}
+                        className="h-11"
                       />
-                    </TableCell>
-                    <TableCell className="min-w-[140px]">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between h-8 text-xs font-normal min-w-[120px]">
-                            <span className="truncate">
-                              {safe.allowed_categories && safe.allowed_categories.trim()
-                                ? safe.allowed_categories.split(",").map((c) => c.trim()).filter(Boolean).join(", ")
-                                : "Todas (por defecto)"}
-                            </span>
-                            <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto" align="start">
-                          {availableCategories.length > 0 ? (
-                            availableCategories.map((cat: string) => {
-                              const currentCats =
-                                typeof safe.allowed_categories === "string"
-                                  ? safe.allowed_categories
-                                      .split(",")
-                                      .map((c) => c.trim())
-                                      .filter(Boolean)
-                                  : [];
-                              const isSelected = currentCats.includes(cat);
-                              return (
-                                <DropdownMenuCheckboxItem
-                                  key={cat}
-                                  checked={isSelected}
-                                  onCheckedChange={(checked) => {
-                                    const newCats = checked
-                                      ? [...currentCats, cat]
-                                      : currentCats.filter((c: string) => c !== cat);
-                                    updateStorageType(idx, "allowed_categories", newCats.join(", "));
-                                  }}
-                                >
-                                  {cat}
-                                </DropdownMenuCheckboxItem>
-                              );
-                            })
-                          ) : (
-                            <div className="p-2 text-sm text-muted-foreground">No hay categorías en auditoría</div>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        onClick={() => removeStorageType(idx)}
-                        disabled={(storageTypes ?? []).length <= 1}
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+                    </div>
+                  )}
+                  <div className="space-y-2 sm:col-span-3">
+                    <Label className="text-xs">Categorías Permitidas</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between h-11 text-left font-normal">
+                          <span className="truncate">
+                            {safe.categories && safe.categories.length > 0
+                              ? safe.categories.join(", ")
+                              : "Todas (por defecto)"}
+                          </span>
+                          <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto" align="start">
+                        {availableCategories.length > 0 ? (
+                          availableCategories.map((cat: string) => {
+                            const currentCats = safe.categories ?? [];
+                            const isSelected = currentCats.includes(cat);
+                            return (
+                              <DropdownMenuCheckboxItem
+                                key={cat}
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  const newCats = checked
+                                    ? [...currentCats, cat]
+                                    : currentCats.filter((c: string) => c !== cat);
+                                  updateStorageType(idx, "categories", newCats);
+                                }}
+                              >
+                                {cat}
+                              </DropdownMenuCheckboxItem>
+                            );
+                          })
+                        ) : (
+                          <div className="p-2 text-sm text-muted-foreground">No hay categorías en auditoría</div>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Results */}
@@ -598,6 +659,18 @@ export function Step3MacroSlotting() {
                       <Package className="w-5 h-5 text-primary" />
                     </div>
                     <span className="font-semibold">{storageName}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      Volumen Ocupado: {(alloc as Record<string, unknown>).occupancy_pct_real != null
+                        ? Number((alloc as Record<string, unknown>).occupancy_pct_real).toFixed(1)
+                        : (alloc.fill_percentage?.toFixed(1) ?? alloc.fill_percentage ?? "0")}%
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      Peso Total Asignado: {((alloc as Record<string, unknown>).total_weight_allocated != null
+                        ? Number((alloc as Record<string, unknown>).total_weight_allocated)
+                        : 0).toLocaleString()} KG
+                    </Badge>
                   </div>
                   <div className="space-y-1 text-sm">
                     <p><span className="text-muted-foreground">SKUs:</span> <strong>{alloc.skus_count}</strong></p>
@@ -716,115 +789,66 @@ export function Step3MacroSlotting() {
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
-                          onClick={() => handleSort("vol_cycle")}
-                        >
-                          Vol. Ciclo <SortIcon col="vol_cycle" />
-                        </button>
-                      </TableHead>
-                      <TableHead>
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 hover:text-foreground font-medium"
-                          onClick={() => handleSort("weight")}
-                        >
-                          Peso (kg) <SortIcon col="weight" />
-                        </button>
-                      </TableHead>
-                      <TableHead>
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 hover:text-foreground font-medium"
-                          onClick={() => handleSort("cajas_ciclo")}
-                        >
-                          Cajas de Ciclo <SortIcon col="cajas_ciclo" />
-                        </button>
-                      </TableHead>
-                      <TableHead>
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 hover:text-foreground font-medium"
                           onClick={() => handleSort("category")}
                         >
                           Categoría <SortIcon col="category" />
                         </button>
                       </TableHead>
-                      <TableHead className="text-right">
+                      <TableHead>Dimensiones (L x A x H)</TableHead>
+                      <TableHead>
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
-                          onClick={() => handleSort("height")}
+                          onClick={() => handleSort("replenishment_units")}
                         >
-                          Alto (mm) <SortIcon col="height" />
+                          Unid. Reposición <SortIcon col="replenishment_units" />
                         </button>
                       </TableHead>
-                      <TableHead className="text-right">
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 hover:text-foreground font-medium"
-                          onClick={() => handleSort("width")}
-                        >
-                          Ancho (mm) <SortIcon col="width" />
-                        </button>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 hover:text-foreground font-medium"
-                          onClick={() => handleSort("length")}
-                        >
-                          Largo (mm) <SortIcon col="length" />
-                        </button>
-                      </TableHead>
+                      <TableHead>Vol. Total (m³)</TableHead>
+                      <TableHead>Peso Total (KG)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedRows.map((row, rowIdx) => {
                       const skuId = row?.sku_id ?? `row-${rowIdx}`;
-                      const volCycle = Number(row?.vol_cycle) || 0;
-                      const boxesPerM3 = Number(row?.boxes_per_m3) || 0;
+                      const dims = [row?.length, row?.width, row?.height]
+                        .map((v) => (v != null ? String(v) : "-"))
+                        .join(" x ");
                       return (
-                      <TableRow key={skuId}>
-                        <TableCell className="font-mono text-sm">{row?.sku_id ?? "—"}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate" title={row?.description ?? ""}>
-                          {row?.description || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <Select
-                            value={row?.storage_type ?? ""}
-                            onValueChange={(v) => updateTableStorageType(skuId, v)}
-                          >
-                            <SelectTrigger className="h-8 text-xs min-w-[100px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(storageTypeOptions ?? []).map((opt, optIdx) => (
-                                <SelectItem key={opt ?? `opt-${optIdx}`} value={opt ?? ""} className="text-xs">
-                                  {opt ?? ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums">
-                          {volCycle.toFixed(4)}
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums">
-                          {(Number(row?.weight) || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums">
-                          {(volCycle * boxesPerM3).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-sm">{row?.category || "—"}</TableCell>
-                        <TableCell className="text-sm tabular-nums text-right">
-                          {row?.height != null ? row.height : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums text-right">
-                          {row?.width != null ? row.width : "-"}
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums text-right">
-                          {row?.length != null ? row.length : "-"}
-                        </TableCell>
-                      </TableRow>
+                        <TableRow key={skuId}>
+                          <TableCell className="font-mono text-sm">{row?.sku_id ?? "—"}</TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate" title={row?.description ?? ""}>
+                            {row?.description || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={row?.storage_type ?? ""}
+                              onValueChange={(v) => updateTableStorageType(skuId, v)}
+                            >
+                              <SelectTrigger className="h-8 text-xs min-w-[100px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(storageTypeOptions ?? []).map((opt, optIdx) => (
+                                  <SelectItem key={opt ?? `opt-${optIdx}`} value={opt ?? ""} className="text-xs">
+                                    {opt ?? ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-sm">{row?.category || "—"}</TableCell>
+                          <TableCell className="text-sm tabular-nums font-mono">{dims}</TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {row?.replenishment_units != null ? Number(row.replenishment_units).toFixed(1) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {row?.total_vol != null ? Number(row.total_vol).toFixed(4) : "—"}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {row?.total_weight != null ? Number(row.total_weight).toFixed(2) : "—"}
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
                   </TableBody>

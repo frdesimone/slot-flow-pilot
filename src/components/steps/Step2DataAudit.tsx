@@ -458,9 +458,9 @@ export function Step2DataAudit() {
                               <SelectItem value="percentile">Percentiles (%)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 min-w-fit">
                             <div className="space-y-1">
-                              <Label className="text-[10px]">
+                              <Label className="text-xs">
                                 {rule.rule_type === "percentile" ? "Percentil Inf. (%)" : "Mínimo"}
                               </Label>
                               <Input
@@ -468,13 +468,13 @@ export function Step2DataAudit() {
                                 step={rule.attribute === "frequency" ? 0.01 : 0.1}
                                 value={rule.min_val}
                                 onChange={(e) => updateRule(idx, { min_val: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
-                                className="h-8 w-16 text-xs"
+                                className="h-8 w-28 text-xs"
                                 min={rule.rule_type === "percentile" ? 0 : undefined}
                                 max={rule.rule_type === "percentile" ? 100 : undefined}
                               />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-[10px]">
+                              <Label className="text-xs">
                                 {rule.rule_type === "percentile" ? "Percentil Sup. (%)" : "Máximo"}
                               </Label>
                               <Input
@@ -482,7 +482,7 @@ export function Step2DataAudit() {
                                 step={rule.attribute === "frequency" ? 0.01 : 0.1}
                                 value={rule.max_val}
                                 onChange={(e) => updateRule(idx, { max_val: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
-                                className="h-8 w-16 text-xs"
+                                className="h-8 w-28 text-xs"
                                 min={rule.rule_type === "percentile" ? 0 : undefined}
                                 max={rule.rule_type === "percentile" ? 100 : undefined}
                               />
