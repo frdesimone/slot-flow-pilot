@@ -122,11 +122,28 @@ function getOccupancyBadgeClass(pct: number): string {
 }
 
 export function Step4MicroSlotting() {
-  const { state, updateState, completeStep, setStep } = useSlotting();
-  const [running, setRunning] = useState(false);
-  const [weights, setWeights] = useState({ affinity: 75, rotation: 15, height: 10 });
-  const [storageConfigs, setStorageConfigs] = useState<Record<string, StorageConfigForm>>({});
+  const { state, updateState, completeStep, setStep, microParams, setMicroParams, isMicroRunning, setIsMicroRunning } = useSlotting();
   const { toast } = useToast();
+
+  const [weights, setWeights] = useState(() => {
+    const saved = microParams?.weights;
+    if (saved && typeof saved === "object" && "affinity" in saved && "rotation" in saved && "height" in saved) {
+      return {
+        affinity: Number(saved.affinity) || 75,
+        rotation: Number(saved.rotation) || 15,
+        height: Number(saved.height) || 10,
+      };
+    }
+    return { affinity: 75, rotation: 15, height: 10 };
+  });
+
+  const [storageConfigs, setStorageConfigs] = useState<Record<string, StorageConfigForm>>(() => {
+    const saved = microParams?.storageConfigs;
+    if (saved && typeof saved === "object" && Object.keys(saved).length > 0) {
+      return saved as Record<string, StorageConfigForm>;
+    }
+    return {};
+  });
 
   const weightsSum = weights.affinity + weights.rotation + weights.height;
   const weightsValid = weightsSum === 100;
@@ -135,6 +152,12 @@ export function Step4MicroSlotting() {
   const storageTypeList = useMemo(() => getUniqueStorageTypes(macroResult), [macroResult]);
   const vlmSkusIds = getVlmSkusIds(macroResult);
   const hasMacroResults = (macroResult?.macro_skus?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (microParams?.cycleDays != null) {
+      updateState({ coverageDays: microParams.cycleDays });
+    }
+  }, []);
 
   useEffect(() => {
     if (storageTypeList.length === 0) return;
@@ -148,6 +171,15 @@ export function Step4MicroSlotting() {
       return next;
     });
   }, [storageTypeList.join(",")]);
+
+  useEffect(() => {
+    setMicroParams((prev) => ({
+      ...prev,
+      storageConfigs,
+      weights,
+      cycleDays: state.coverageDays,
+    }));
+  }, [storageConfigs, weights, state.coverageDays, setMicroParams]);
 
   const handleRun = async () => {
     if (!state.dataFile) {
@@ -169,7 +201,7 @@ export function Step4MicroSlotting() {
     }
 
     try {
-      setRunning(true);
+      setIsMicroRunning(true);
 
       const storages = storageTypeList.map((st) => {
         const cfg = storageConfigs[st] ?? DEFAULT_STORAGE_CONFIG;
@@ -295,7 +327,7 @@ export function Step4MicroSlotting() {
       });
       // No actualizamos microResult en error: los resultados previos se preservan
     } finally {
-      setRunning(false);
+      setIsMicroRunning(false);
     }
   };
 
@@ -398,9 +430,18 @@ export function Step4MicroSlotting() {
             </p>
           )}
         </div>
-        <Button onClick={handleRun} disabled={running || !hasMacroResults || !weightsValid} className="gap-2" size="lg">
-          <Play className="w-4 h-4" />
-          {running ? "Optimizando..." : "Ejecutar Micro-Slotting"}
+        <Button onClick={handleRun} disabled={isMicroRunning || !hasMacroResults || !weightsValid} className="gap-2" size="lg">
+          {isMicroRunning ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Corriendo...
+            </>
+          ) : (
+            <>
+              <Play className="w-4 h-4" />
+              Ejecutar Micro-Slotting
+            </>
+          )}
         </Button>
       </div>
 
@@ -428,10 +469,10 @@ export function Step4MicroSlotting() {
           <p className="text-xs text-muted-foreground mt-0.5">Días de cobertura, hardware y dimensiones</p>
         </div>
         <CardContent className="py-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             <div className="space-y-1.5">
               <Label className="text-xs">Días de Cobertura (cycle days)</Label>
-              <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15) })} className="h-9" />
+              <Input type="number" value={state.coverageDays} onChange={(e) => updateState({ coverageDays: e.target.value === "" ? "" : (parseInt(e.target.value, 10) || 15) })} />
             </div>
           </div>
 
@@ -449,7 +490,7 @@ export function Step4MicroSlotting() {
                       Configuración: {st}
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 pt-0">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                         <div className="space-y-1.5">
                           <Label className="text-xs">Bandejas máx</Label>
                           <Input
@@ -462,7 +503,6 @@ export function Step4MicroSlotting() {
                                 [st]: { ...prev[st], maxTrays: e.target.value },
                               }))
                             }
-                            className="h-9"
                             placeholder="100"
                           />
                         </div>
@@ -478,7 +518,6 @@ export function Step4MicroSlotting() {
                                 [st]: { ...prev[st], maxWeight: e.target.value },
                               }))
                             }
-                            className="h-9"
                             placeholder="250"
                           />
                         </div>
@@ -494,7 +533,6 @@ export function Step4MicroSlotting() {
                                 [st]: { ...prev[st], trayLength: e.target.value },
                               }))
                             }
-                            className="h-9"
                             placeholder="2400"
                           />
                         </div>
@@ -510,7 +548,6 @@ export function Step4MicroSlotting() {
                                 [st]: { ...prev[st], trayWidth: e.target.value },
                               }))
                             }
-                            className="h-9"
                             placeholder="800"
                           />
                         </div>
@@ -546,7 +583,7 @@ export function Step4MicroSlotting() {
                 <p className="text-xs text-muted-foreground mb-4">
                   Los pesos definen cómo el algoritmo prioriza Afinidad, Rotación y Altura al agrupar SKUs en bandejas. La suma debe ser exactamente 100%.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Afinidad (%) — Co-ocurrencia en pedidos</Label>
                     <Input
@@ -555,7 +592,6 @@ export function Step4MicroSlotting() {
                       max={100}
                       value={weights.affinity}
                       onChange={(e) => setWeights((w) => ({ ...w, affinity: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
-                      className="h-9"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -566,7 +602,6 @@ export function Step4MicroSlotting() {
                       max={100}
                       value={weights.rotation}
                       onChange={(e) => setWeights((w) => ({ ...w, rotation: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
-                      className="h-9"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -577,7 +612,6 @@ export function Step4MicroSlotting() {
                       max={100}
                       value={weights.height}
                       onChange={(e) => setWeights((w) => ({ ...w, height: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
-                      className="h-9"
                     />
                   </div>
                 </div>
@@ -592,7 +626,7 @@ export function Step4MicroSlotting() {
         </CardContent>
       </Card>
 
-      {running && (
+      {isMicroRunning && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -627,7 +661,7 @@ export function Step4MicroSlotting() {
             {storageTabKeys.map((st) => (
               <TabsContent key={st} value={st} className="mt-6 space-y-4">
                 {/* KPIs por Tab */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                   <KPIMini label="Bandejas usadas" value={resultsByStorage[st]?.kpi?.total_trays ?? 0} />
                   <KPIMini label="Ocupación %" value={resultsByStorage[st]?.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
                   <KPIMini label="SKUs Colocados" value={resultsByStorage[st]?.kpi?.skus_placed ?? 0} />
@@ -655,15 +689,15 @@ export function Step4MicroSlotting() {
                       Exportar a CSV
                     </Button>
                   </div>
-                  <div className="px-5 py-3 border-b flex flex-wrap items-center gap-3">
+                  <div className="px-5 py-3 border-b grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                     <Input
                       placeholder="Buscar por ID de bandeja o SKU"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="h-9 max-w-[280px] text-sm"
+                      className="w-full"
                     />
                     <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                      <SelectTrigger className="h-9 w-[200px] text-sm">
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Ordenar por" />
                       </SelectTrigger>
                       <SelectContent>
@@ -687,7 +721,7 @@ export function Step4MicroSlotting() {
                       </div>
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                           {paginatedTrays.map((tray, idx) => {
                             const pct = Number(tray?.occupancy_pct ?? 0);
                             const itemCount = Number(tray?.item_count ?? 0);
@@ -779,7 +813,7 @@ export function Step4MicroSlotting() {
         </div>
       )}
 
-      {!micro && !running && (
+      {!micro && !isMicroRunning && (
         <Card className="border-dashed bg-muted/30">
           <CardContent className="py-10 px-6 text-center">
             <p className="text-sm text-muted-foreground">

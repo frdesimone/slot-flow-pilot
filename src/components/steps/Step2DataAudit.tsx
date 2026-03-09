@@ -24,6 +24,7 @@ export interface OutlierRule {
   min_val: number | string;
   max_val: number | string;
   enabled: boolean;
+  rule_type?: "absolute" | "percentile";
 }
 
 const SKU_ATTRIBUTES = [
@@ -41,10 +42,10 @@ const ORDER_ATTRIBUTES = [
 ];
 
 const DEFAULT_RULES: OutlierRule[] = [
-  { id: "heavy", name: "Pesados", target: "sku", attribute: "weight", min_val: 0, max_val: 25, enabled: true },
-  { id: "bulky", name: "Voluminosos", target: "sku", attribute: "volume", min_val: 0, max_val: 0.05, enabled: true },
-  { id: "massive", name: "Pedidos B2B", target: "order", attribute: "lines", min_val: 0, max_val: 50, enabled: true },
-  { id: "ubiquitous", name: "Omnipresentes", target: "sku", attribute: "frequency", min_val: 0, max_val: 0.15, enabled: true },
+  { id: "heavy", name: "Pesados", target: "sku", attribute: "weight", min_val: 0, max_val: 25, enabled: true, rule_type: "absolute" },
+  { id: "bulky", name: "Voluminosos", target: "sku", attribute: "volume", min_val: 0, max_val: 0.05, enabled: true, rule_type: "absolute" },
+  { id: "massive", name: "Pedidos B2B", target: "order", attribute: "lines", min_val: 0, max_val: 50, enabled: true, rule_type: "absolute" },
+  { id: "ubiquitous", name: "Omnipresentes", target: "sku", attribute: "frequency", min_val: 0, max_val: 0.15, enabled: true, rule_type: "absolute" },
 ];
 
 function generateRuleId(): string {
@@ -190,7 +191,7 @@ export function Step2DataAudit() {
   const addRule = useCallback(() => {
     setRules((prev) => [
       ...prev,
-      { id: generateRuleId(), name: "Nueva regla", target: "sku", attribute: "weight", min_val: 0, max_val: 100, enabled: true },
+      { id: generateRuleId(), name: "Nueva regla", target: "sku", attribute: "weight", min_val: 0, max_val: 100, enabled: true, rule_type: "absolute" },
     ]);
   }, []);
 
@@ -223,6 +224,7 @@ export function Step2DataAudit() {
         min_val: Number(r.min_val) || 0,
         max_val: Number(r.max_val) ?? (r.attribute === "frequency" ? 0.15 : 100),
         enabled: r.enabled,
+        rule_type: r.rule_type || "absolute",
       }));
       formData.append("outliers_config", JSON.stringify(safeRules));
 
@@ -431,25 +433,51 @@ export function Step2DataAudit() {
                               ))}
                             </SelectContent>
                           </Select>
+                          <Select
+                            value={rule.rule_type || "absolute"}
+                            onValueChange={(v: "absolute" | "percentile") =>
+                              updateRule(idx, {
+                                rule_type: v,
+                                min_val: v === "percentile" ? 5 : 0,
+                                max_val: v === "percentile" ? 95 : 100,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[140px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="absolute">Absoluto</SelectItem>
+                              <SelectItem value="percentile">Percentiles (%)</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <div className="flex gap-2">
                             <div className="space-y-1">
-                              <Label className="text-[10px]">Mín</Label>
+                              <Label className="text-[10px]">
+                                {rule.rule_type === "percentile" ? "Percentil Inf. (%)" : "Mínimo"}
+                              </Label>
                               <Input
                                 type="number"
                                 step={rule.attribute === "frequency" ? 0.01 : 0.1}
                                 value={rule.min_val}
                                 onChange={(e) => updateRule(idx, { min_val: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                                 className="h-8 w-16 text-xs"
+                                min={rule.rule_type === "percentile" ? 0 : undefined}
+                                max={rule.rule_type === "percentile" ? 100 : undefined}
                               />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-[10px]">Máx</Label>
+                              <Label className="text-[10px]">
+                                {rule.rule_type === "percentile" ? "Percentil Sup. (%)" : "Máximo"}
+                              </Label>
                               <Input
                                 type="number"
                                 step={rule.attribute === "frequency" ? 0.01 : 0.1}
                                 value={rule.max_val}
                                 onChange={(e) => updateRule(idx, { max_val: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                                 className="h-8 w-16 text-xs"
+                                min={rule.rule_type === "percentile" ? 0 : undefined}
+                                max={rule.rule_type === "percentile" ? 100 : undefined}
                               />
                             </div>
                           </div>

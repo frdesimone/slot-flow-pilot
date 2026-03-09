@@ -234,7 +234,7 @@ export function Step1DataIngestion() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Peso (col_peso)</Label>
+                      <Label className="text-xs">Peso (KG)</Label>
                       <Input
                         value={state.mappingConfig.col_peso}
                         onChange={(e) => setMappingConfig({ col_peso: e.target.value })}
@@ -242,7 +242,7 @@ export function Step1DataIngestion() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Alto (col_alto)</Label>
+                      <Label className="text-xs">Alto (CM)</Label>
                       <Input
                         value={state.mappingConfig.col_alto}
                         onChange={(e) => setMappingConfig({ col_alto: e.target.value })}
@@ -252,7 +252,7 @@ export function Step1DataIngestion() {
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Ancho (col_ancho)</Label>
+                      <Label className="text-xs">Ancho (CM)</Label>
                       <Input
                         value={state.mappingConfig.col_ancho}
                         onChange={(e) => setMappingConfig({ col_ancho: e.target.value })}
@@ -260,7 +260,7 @@ export function Step1DataIngestion() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Largo (col_largo)</Label>
+                      <Label className="text-xs">Largo (CM)</Label>
                       <Input
                         value={state.mappingConfig.col_largo}
                         onChange={(e) => setMappingConfig({ col_largo: e.target.value })}
@@ -278,7 +278,7 @@ export function Step1DataIngestion() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs">M3 por Caja (Volumen Masterpack) (col_cajas_m3)</Label>
+                      <Label className="text-xs">UM venta a UM reposición (col_cajas_m3)</Label>
                       <Input
                         value={state.mappingConfig.col_cajas_m3}
                         onChange={(e) => setMappingConfig({ col_cajas_m3: e.target.value })}
@@ -327,7 +327,7 @@ export function Step1DataIngestion() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Columna Cantidad (col_pedido_cant)</Label>
+                    <Label className="text-xs">Cantidad UM de venta (col_pedido_cant)</Label>
                     <Input
                       value={state.mappingConfig.col_pedido_cant}
                       onChange={(e) => setMappingConfig({ col_pedido_cant: e.target.value })}

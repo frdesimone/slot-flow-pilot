@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, ReactNode, Dispatch, SetStateAction } from "react";
 
 // Types
 export interface StorageType {
@@ -196,6 +196,14 @@ interface SlottingContextType {
   setDataFile: (file: File | null) => void;
   setMappingConfig: (partial: Partial<MappingConfig>) => void;
   setAuditResults: (results: AuditResultsRaw | null) => void;
+  macroParams: Record<string, unknown>;
+  setMacroParams: Dispatch<SetStateAction<Record<string, unknown>>>;
+  isMacroRunning: boolean;
+  setIsMacroRunning: Dispatch<SetStateAction<boolean>>;
+  microParams: Record<string, unknown>;
+  setMicroParams: Dispatch<SetStateAction<Record<string, unknown>>>;
+  isMicroRunning: boolean;
+  setIsMicroRunning: Dispatch<SetStateAction<boolean>>;
 }
 
 const defaultStorageTypes: StorageType[] = [
@@ -209,17 +217,17 @@ const defaultMappingConfig: MappingConfig = {
   period_days: 180,
   sheet_maestro: "Base Cód.",
   col_sku_maestro: "Material",
-  col_peso: "KG/UMB",
-  col_alto: "Alto",
-  col_ancho: "Ancho",
-  col_largo: "Largo",
+  col_peso: "Peso (KG)",
+  col_alto: "Alto (CM)",
+  col_ancho: "Ancho (CM)",
+  col_largo: "Largo (CM)",
   col_desc: "Descripción",
-  col_cajas_m3: "Cajas/M3",
+  col_cajas_m3: "UM venta a UM reposición",
   col_categoria: "Categoría",
   sheet_pedidos: "Pedidos",
   col_pedido_id: "Nro pedido",
   col_pedido_sku: "Codigo II - Producto",
-  col_pedido_cant: "Cantidad unidades",
+  col_pedido_cant: "Cantidad UM de venta",
   col_pedido_fecha: "Fecha",
 };
 
@@ -257,6 +265,10 @@ const SlottingContext = createContext<SlottingContextType | undefined>(undefined
 
 export function SlottingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SlottingState>(initialState);
+  const [macroParams, setMacroParams] = useState<Record<string, unknown>>({});
+  const [isMacroRunning, setIsMacroRunning] = useState(false);
+  const [microParams, setMicroParams] = useState<Record<string, unknown>>({});
+  const [isMicroRunning, setIsMicroRunning] = useState(false);
 
   const setStep = useCallback((step: number) => {
     setState((prev) => ({ ...prev, currentStep: step }));
@@ -295,7 +307,23 @@ export function SlottingProvider({ children }: { children: ReactNode }) {
 
   return (
     <SlottingContext.Provider
-      value={{ state, setStep, completeStep, updateState, setDataFile, setMappingConfig, setAuditResults }}
+      value={{
+        state,
+        setStep,
+        completeStep,
+        updateState,
+        setDataFile,
+        setMappingConfig,
+        setAuditResults,
+        macroParams,
+        setMacroParams,
+        isMacroRunning,
+        setIsMacroRunning,
+        microParams,
+        setMicroParams,
+        isMicroRunning,
+        setIsMicroRunning,
+      }}
     >
       {children}
     </SlottingContext.Provider>

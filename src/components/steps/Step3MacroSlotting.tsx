@@ -108,11 +108,20 @@ function extractOrderId(obj: Record<string, unknown>): string | null {
 }
 
 export function Step3MacroSlotting() {
-  const { state, updateState, completeStep, setStep } = useSlotting();
-  const [running, setRunning] = useState(false);
+  const { state, updateState, completeStep, setStep, macroParams, setMacroParams, isMacroRunning, setIsMacroRunning } = useSlotting();
   const { toast } = useToast();
 
-  const [storageTypes, setStorageTypes] = useState<MacroStorageType[]>(() => [ensureStorageType({ ...DEFAULT_STORAGE })]);
+  const [storageTypes, setStorageTypes] = useState<MacroStorageType[]>(() => {
+    const saved = macroParams?.storageTypes;
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved.map((st) => ensureStorageType(st));
+    }
+    return [ensureStorageType({ ...DEFAULT_STORAGE })];
+  });
+
+  useEffect(() => {
+    setMacroParams((prev) => ({ ...prev, storageTypes }));
+  }, [storageTypes, setMacroParams]);
 
   const handleRun = async () => {
     if (!state?.dataFile) {
@@ -125,7 +134,7 @@ export function Step3MacroSlotting() {
     }
 
     try {
-      setRunning(true);
+      setIsMacroRunning(true);
 
       const formData = new FormData();
       formData.append("file", state!.dataFile);
@@ -197,7 +206,7 @@ export function Step3MacroSlotting() {
         variant: "destructive",
       });
     } finally {
-      setRunning(false);
+      setIsMacroRunning(false);
     }
   };
 
@@ -361,9 +370,18 @@ export function Step3MacroSlotting() {
             Configure los tipos de almacenamiento y ejecute la asignación ABC de SKUs.
           </p>
         </div>
-        <Button onClick={handleRun} disabled={running} className="gap-2" size="lg">
-          <Play className="w-4 h-4" />
-          {running ? "Ejecutando..." : "Ejecutar Macro-Slotting"}
+        <Button onClick={handleRun} disabled={isMacroRunning} className="gap-2" size="lg">
+          {isMacroRunning ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Corriendo...
+            </>
+          ) : (
+            <>
+              <Play className="w-4 h-4" />
+              Ejecutar Macro-Slotting
+            </>
+          )}
         </Button>
       </div>
 
@@ -560,15 +578,15 @@ export function Step3MacroSlotting() {
                   Exportar a CSV
                 </Button>
               </div>
-              <div className="px-5 py-3 border-b flex flex-wrap items-center gap-3">
+              <div className="px-5 py-3 border-b grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Input
                   placeholder="Buscar por Código o Descripción"
                   value={filterText}
                   onChange={(e) => setFilterText(e.target.value)}
-                  className="h-9 max-w-[240px] text-sm"
+                  className="max-w-full"
                 />
                 <Select value={filterStorageType || "all"} onValueChange={(v) => setFilterStorageType(v === "all" ? "" : v)}>
-                  <SelectTrigger className="h-9 w-[180px] text-sm">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Filtrar por Storage Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -581,7 +599,7 @@ export function Step3MacroSlotting() {
                   </SelectContent>
                 </Select>
                 <Select value={filterCategory || "all"} onValueChange={(v) => setFilterCategory(v === "all" ? "" : v)}>
-                  <SelectTrigger className="h-9 w-[180px] text-sm">
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Filtrar por Categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -774,7 +792,7 @@ export function Step3MacroSlotting() {
         </div>
       )}
 
-      {!macro && !running && (
+      {!macro && !isMacroRunning && (
         <Card className="border-dashed bg-muted/30">
           <CardContent className="py-10 px-6 text-center">
             <p className="text-sm text-muted-foreground">
