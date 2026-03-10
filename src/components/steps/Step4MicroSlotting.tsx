@@ -186,6 +186,8 @@ export function Step4MicroSlotting() {
         max_h_loc?: number;
         max_h_storage?: number;
         is_variable_height?: boolean;
+        is_multiproduct?: boolean;
+        stackability_factor?: number;
       };
 
       const storages: StoragePayload[] =
@@ -210,6 +212,8 @@ export function Step4MicroSlotting() {
                 max_h_loc: Number(st?.max_h_loc ?? 0.5) || 0.5,
                 max_h_storage: Number(st?.max_h_storage ?? 5) || 5,
                 is_variable_height: isVarH,
+                is_multiproduct: Boolean(st?.is_multiproduct ?? true),
+                stackability_factor: Number(st?.stackability_factor ?? 1) || 1,
               };
             })
           : storageTypeList.map((st) => ({

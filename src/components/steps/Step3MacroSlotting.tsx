@@ -27,6 +27,8 @@ type MacroStorageType = {
   cycle_days: number | string;
   cycle_vol_limit: number | string;
   categories: string[];
+  is_multiproduct: boolean;
+  stackability_factor: number | string;
 };
 
 type MacroSkuRow = {
@@ -58,6 +60,8 @@ const defaultStorage: MacroStorageType = {
   cycle_days: 15,
   cycle_vol_limit: 100,
   categories: [],
+  is_multiproduct: true,
+  stackability_factor: 1,
 };
 
 function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknown> | undefined): MacroStorageType {
@@ -79,6 +83,8 @@ function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknow
     cycle_days: st.cycle_days ?? defaultStorage.cycle_days,
     cycle_vol_limit: st.cycle_vol_limit ?? defaultStorage.cycle_vol_limit,
     categories,
+    is_multiproduct: st.is_multiproduct ?? defaultStorage.is_multiproduct,
+    stackability_factor: st.stackability_factor ?? defaultStorage.stackability_factor,
   };
 }
 
@@ -187,6 +193,8 @@ export function Step3MacroSlotting() {
           cycle_days: Number(safe.cycle_days) || 15,
           cycle_vol_limit: Number(safe.cycle_vol_limit) || 100,
           categories: Array.isArray(safe.categories) ? safe.categories : [],
+          is_multiproduct: Boolean(safe.is_multiproduct),
+          stackability_factor: Number(safe.stackability_factor) || 1,
         };
       });
       formData.append("storage_types", JSON.stringify(safeStorageTypes));
@@ -256,11 +264,13 @@ export function Step3MacroSlotting() {
         next[idx] = { ...current, categories: Array.isArray(value) ? value : [] };
       } else if (field === "is_variable_height") {
         next[idx] = { ...current, is_variable_height: Boolean(value) };
+      } else if (field === "is_multiproduct") {
+        next[idx] = { ...current, is_multiproduct: Boolean(value) };
       } else if (typeof value === "number" || value === "") {
         next[idx] = { ...current, [field]: value };
       } else {
-        const num = field === "cycle_days" || field === "num_locations"
-          ? parseInt(String(value), 10) || 0
+        const num = field === "cycle_days" || field === "num_locations" || field === "stackability_factor"
+          ? parseInt(String(value), 10) || (field === "stackability_factor" ? 1 : 0)
           : parseFloat(String(value)) || 0;
         next[idx] = { ...current, [field]: num };
       }
@@ -611,6 +621,35 @@ export function Step3MacroSlotting() {
                       />
                     </div>
                   )}
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">Mezcla</Label>
+                    <Select
+                      value={safe.is_multiproduct ? "multi" : "mono"}
+                      onValueChange={(val) => updateStorageType(idx, "is_multiproduct", val === "multi")}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="multi">Multiproducto</SelectItem>
+                        <SelectItem value="mono">Monoproducto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate" title="Factor de Apilabilidad">
+                      Apilabilidad
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={safe.stackability_factor}
+                      onChange={(e) =>
+                        updateStorageType(idx, "stackability_factor", e.target.value === "" ? "" : Number(e.target.value) || 1)
+                      }
+                      className="h-9 text-sm"
+                    />
+                  </div>
                   <div className="flex flex-col gap-0.5 col-span-2 md:col-span-2 lg:col-span-1">
                     <Label className="text-[11px] uppercase text-muted-foreground truncate">Categorías</Label>
                     <DropdownMenu>
