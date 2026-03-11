@@ -458,7 +458,7 @@ export function Step4MicroSlotting() {
             </>
           ) : (
             <>
-              <Play className="w-4 h-4" />
+          <Play className="w-4 h-4" />
               Ejecutar Micro-Slotting
             </>
           )}
@@ -492,7 +492,7 @@ export function Step4MicroSlotting() {
         </div>
         <CardContent className="py-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                  <div className="space-y-1.5">
+            <div className="space-y-1.5">
                     <Label className="text-xs">Afinidad (%) — Co-ocurrencia en pedidos</Label>
                     <Input
                       type="number"
@@ -501,8 +501,8 @@ export function Step4MicroSlotting() {
                       value={weights.affinity}
                       onChange={(e) => setWeights((w) => ({ ...w, affinity: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+            </div>
+            <div className="space-y-1.5">
                     <Label className="text-xs">Rotación (%) — Frecuencia de venta</Label>
                     <Input
                       type="number"
@@ -511,8 +511,8 @@ export function Step4MicroSlotting() {
                       value={weights.rotation}
                       onChange={(e) => setWeights((w) => ({ ...w, rotation: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
                     />
-                  </div>
-                  <div className="space-y-1.5">
+            </div>
+            <div className="space-y-1.5">
                     <Label className="text-xs">Altura (%) — Compatibilidad dimensional</Label>
                     <Input
                       type="number"
@@ -521,8 +521,8 @@ export function Step4MicroSlotting() {
                       value={weights.height}
                       onChange={(e) => setWeights((w) => ({ ...w, height: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)) }))}
                     />
-                  </div>
-                </div>
+            </div>
+          </div>
           {!weightsValid && (
             <p className="text-sm text-red-600 font-medium mt-3 col-span-full">
               La suma debe ser 100%. Actual: {weightsSum}%
@@ -559,9 +559,9 @@ export function Step4MicroSlotting() {
                   <Badge variant="secondary" className="text-[10px]">
                     {(resultsByStorage[st]?.locations ?? resultsByStorage[st]?.best_trays ?? []).length}
                   </Badge>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
             {storageTabKeys.map((st) => (
               <TabsContent key={st} value={st} className="mt-6 space-y-4">
@@ -584,20 +584,20 @@ export function Step4MicroSlotting() {
                     <h3 className="text-sm font-semibold flex items-center gap-2">
                       <Package className="w-4 h-4" /> Ubicaciones Asignadas — {st}
                     </h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
                       onClick={() =>
                         downloadMicroCSV(
                           (resultsByStorage[st]?.locations ?? resultsByStorage[st]?.best_trays ?? []) as MicroLocation[],
                         )
                       }
-                    >
-                      <Download className="w-4 h-4" />
-                      Exportar a CSV
-                    </Button>
-                  </div>
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar a CSV
+                </Button>
+              </div>
                   <div className="px-5 py-3 border-b grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                     <Input
                       placeholder="Buscar por ID de ubicación o SKU"
@@ -726,9 +726,9 @@ export function Step4MicroSlotting() {
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
-            ))}
-          </Tabs>
+                </TabsContent>
+              ))}
+            </Tabs>
         </div>
       )}
 

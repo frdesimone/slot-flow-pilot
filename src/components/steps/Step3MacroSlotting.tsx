@@ -444,7 +444,7 @@ export function Step3MacroSlotting() {
             </>
           ) : (
             <>
-              <Play className="w-4 h-4" />
+          <Play className="w-4 h-4" />
               Ejecutar Macro-Slotting
             </>
           )}
@@ -454,14 +454,14 @@ export function Step3MacroSlotting() {
       {/* Configuration */}
       <div className="grid grid-cols-1 gap-2">
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
+            <div>
+              <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
             <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Arrastrá para reordenar.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
+              <Plus className="w-3 h-3" /> Añadir
+            </Button>
           </div>
-          <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
-            <Plus className="w-3 h-3" /> Añadir
-          </Button>
-        </div>
 
         {(storageTypes ?? []).map((st, idx) => {
           const safe = ensureStorageType(st);
@@ -515,9 +515,9 @@ export function Step3MacroSlotting() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-2 items-end">
                   <div className="flex flex-col gap-0.5">
                     <Label className="text-[11px] uppercase text-muted-foreground truncate">Ubicaciones</Label>
-                    <Input
-                      type="number"
-                      min={1}
+                      <Input
+                        type="number"
+                        min={1}
                       value={safe.num_locations}
                       onChange={(e) => updateStorageType(idx, "num_locations", e.target.value === "" ? "" : Number(e.target.value) || 0)}
                       className="h-9 text-sm"
@@ -525,7 +525,7 @@ export function Step3MacroSlotting() {
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <Label className="text-[11px] uppercase text-muted-foreground truncate">Ancho (m)</Label>
-                    <Input
+                      <Input
                       type="number"
                       step={0.01}
                       min={0}
@@ -536,9 +536,9 @@ export function Step3MacroSlotting() {
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <Label className="text-[11px] uppercase text-muted-foreground truncate">Largo (m)</Label>
-                    <Input
-                      type="number"
-                      step={0.01}
+                      <Input
+                        type="number"
+                        step={0.01}
                       min={0}
                       value={safe.max_l}
                       onChange={(e) => updateStorageType(idx, "max_l", e.target.value === "" ? "" : Number(e.target.value) || 0)}
@@ -580,8 +580,8 @@ export function Step3MacroSlotting() {
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <Label className="text-[11px] uppercase text-muted-foreground truncate">Vol límite</Label>
-                    <Input
-                      type="number"
+                      <Input
+                        type="number"
                       step={0.01}
                       min={0}
                       value={safe.cycle_vol_limit}
@@ -661,7 +661,7 @@ export function Step3MacroSlotting() {
                               : "Todas"}
                           </span>
                           <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
-                        </Button>
+                      </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto" align="start">
                         {availableCategories.length > 0 ? (
@@ -689,9 +689,9 @@ export function Step3MacroSlotting() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </div>
+          </div>
               </CardContent>
-            </Card>
+        </Card>
           );
         })}
       </div>
@@ -849,7 +849,7 @@ export function Step3MacroSlotting() {
                         >
                           Unid. Reposición <SortIcon col="replenishment_units" />
                         </button>
-                      </TableHead>
+                          </TableHead>
                       <TableHead>Vol. Total (m³)</TableHead>
                       <TableHead>Peso Total (KG)</TableHead>
                     </TableRow>
@@ -862,7 +862,7 @@ export function Step3MacroSlotting() {
                           <TableCell className="font-mono text-sm">{row?.sku_id ?? "—"}</TableCell>
                           <TableCell className="text-sm max-w-[200px] truncate" title={row?.description ?? ""}>
                             {row?.description || "—"}
-                          </TableCell>
+                            </TableCell>
                           <TableCell>
                             <Select
                               value={row?.storage_type ?? ""}
