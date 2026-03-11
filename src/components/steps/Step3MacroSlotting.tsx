@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, formatNum } from "@/lib/utils";
 
 type MacroStorageType = {
   name: string;
@@ -712,14 +712,10 @@ export function Step3MacroSlotting() {
                   </div>
                   <div className="flex flex-wrap gap-2 mb-3">
                     <Badge variant="secondary" className="text-xs font-normal">
-                      Volumen Ocupado: {(alloc as Record<string, unknown>).occupancy_pct_real != null
-                        ? Number((alloc as Record<string, unknown>).occupancy_pct_real).toFixed(1)
-                        : (alloc.fill_percentage?.toFixed(1) ?? alloc.fill_percentage ?? "0")}%
+                      Volumen Ocupado: {formatNum((alloc as Record<string, unknown>).occupancy_pct_real ?? alloc.fill_percentage)}%
                     </Badge>
                     <Badge variant="secondary" className="text-xs font-normal">
-                      Peso Total Asignado: {((alloc as Record<string, unknown>).total_weight_allocated != null
-                        ? Number((alloc as Record<string, unknown>).total_weight_allocated)
-                        : 0).toLocaleString()} KG
+                      Peso Total Asignado: {formatNum((alloc as Record<string, unknown>).total_weight_allocated)} KG
                     </Badge>
                   </div>
                   <div className="space-y-1 text-sm">
@@ -861,9 +857,6 @@ export function Step3MacroSlotting() {
                   <TableBody>
                     {paginatedRows.map((row, rowIdx) => {
                       const skuId = row?.sku_id ?? `row-${rowIdx}`;
-                      const dims = [row?.length, row?.width, row?.height]
-                        .map((v) => (v != null ? String(v) : "-"))
-                        .join(" x ");
                       return (
                         <TableRow key={skuId}>
                           <TableCell className="font-mono text-sm">{row?.sku_id ?? "—"}</TableCell>
@@ -888,15 +881,17 @@ export function Step3MacroSlotting() {
                             </Select>
                           </TableCell>
                           <TableCell className="text-sm">{row?.category || "—"}</TableCell>
-                          <TableCell className="text-sm tabular-nums font-mono">{dims}</TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {row?.replenishment_units != null ? Number(row.replenishment_units).toFixed(1) : "—"}
+                          <TableCell className="text-sm tabular-nums font-mono">
+                            {formatNum(row?.length)} x {formatNum(row?.width)} x {formatNum(row?.height)}
                           </TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {row?.total_vol != null ? Number(row.total_vol).toFixed(4) : "—"}
+                          <TableCell className="text-sm tabular-nums text-right">
+                            {formatNum(row?.replenishment_units)}
                           </TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {row?.total_weight != null ? Number(row.total_weight).toFixed(2) : "—"}
+                          <TableCell className="text-sm tabular-nums text-right">
+                            {formatNum(row?.total_vol)}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums text-right">
+                            {formatNum(row?.total_weight)}
                           </TableCell>
                         </TableRow>
                       );

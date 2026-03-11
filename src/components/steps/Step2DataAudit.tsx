@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
+import { formatNum } from "@/lib/utils";
 
 export interface OutlierRule {
   id: string;
@@ -98,11 +99,14 @@ function ValidationColumn({ title, data }: { title: string; data: DataValidation
               <TableBody>
                 {sample.map((row, idx) => (
                   <TableRow key={idx}>
-                    {headers.map((h) => (
-                      <TableCell key={h} className="text-xs">
-                        {row[h] != null ? String(row[h]) : ""}
-                      </TableCell>
-                    ))}
+                    {Object.entries(row as Record<string, any>).map(([key, val], j) => {
+                      const isNumericColumn = /(peso|alto|ancho|largo|volumen|cajas|um|qty|cantidad)/i.test(key);
+                      return (
+                        <TableCell key={j} className="text-xs">
+                          {isNumericColumn ? formatNum(val) : (val != null ? String(val) : "-")}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
               </TableBody>
@@ -522,12 +526,12 @@ export function Step2DataAudit() {
       {hasResults && auditResults?.summary && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 animate-slide-in mb-6">
           {[
-            { label: "Total SKUs", value: (auditResults.summary as Record<string, unknown>).total_skus?.toLocaleString() },
-            { label: "Total Pedidos", value: (auditResults.summary as Record<string, unknown>).total_pedidos?.toLocaleString() },
-            { label: "Total Unidades", value: (auditResults.summary as Record<string, unknown>).total_unidades?.toLocaleString() },
-            { label: "Total Líneas", value: (auditResults.summary as Record<string, unknown>).total_lineas?.toLocaleString() },
-            { label: "Líneas / Pedido", value: (auditResults.summary as Record<string, unknown>).lineas_por_pedido },
-            { label: "Total KG", value: `${(auditResults.summary as Record<string, unknown>).total_kg?.toLocaleString()} kg` },
+            { label: "Total SKUs", value: formatNum((auditResults.summary as Record<string, unknown>).total_skus) },
+            { label: "Total Pedidos", value: formatNum((auditResults.summary as Record<string, unknown>).total_pedidos) },
+            { label: "Total Unidades", value: formatNum((auditResults.summary as Record<string, unknown>).total_unidades) },
+            { label: "Total Líneas", value: formatNum((auditResults.summary as Record<string, unknown>).total_lineas) },
+            { label: "Líneas / Pedido", value: formatNum((auditResults.summary as Record<string, unknown>).lineas_por_pedido) },
+            { label: "Total KG", value: `${formatNum((auditResults.summary as Record<string, unknown>).total_kg)} kg` },
           ].map((stat, i) => (
             <Card key={i} className="border bg-slate-50/50 dark:bg-slate-800/50">
               <CardContent className="p-4 flex flex-col items-center justify-center text-center">
@@ -668,11 +672,15 @@ export function Step2DataAudit() {
                               const headers = [...new Set(Object.keys(item ?? {}))].filter(
                                 (h) => !["sku_id", "order_id", "id", "description"].includes(h)
                               );
-                              return headers.map((h) => (
-                                <TableCell key={h} className="text-sm">
-                                  {typeof item?.[h] === "number" ? (item[h] as number).toLocaleString() : String(item?.[h] ?? "")}
-                                </TableCell>
-                              ));
+                              return headers.map((h) => {
+                                const val = item?.[h];
+                                const isNumericColumn = /(peso|alto|ancho|largo|volumen|cajas|um|qty|cantidad|value)/i.test(h);
+                                return (
+                                  <TableCell key={h} className={`text-sm ${isNumericColumn ? "text-right font-mono" : ""}`}>
+                                    {isNumericColumn ? formatNum(val) : (val != null ? String(val) : "-")}
+                                  </TableCell>
+                                );
+                              });
                             })()}
                           </TableRow>
                         );

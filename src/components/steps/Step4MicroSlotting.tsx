@@ -11,15 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatNum } from "@/lib/utils";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
-
-function formatNum(val: number | string | undefined | null): string {
-  if (val == null || val === "") return "-";
-  const num = Number(val);
-  if (isNaN(num)) return String(val);
-  return num.toLocaleString("es-AR", { maximumFractionDigits: 3 });
-}
 
 function KPIMini({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
