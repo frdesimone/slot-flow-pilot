@@ -14,6 +14,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
 
+function formatNum(val: number | string | undefined | null): string {
+  if (val == null || val === "") return "-";
+  const num = Number(val);
+  if (isNaN(num)) return String(val);
+  return num.toLocaleString("es-AR", { maximumFractionDigits: 3 });
+}
+
 function KPIMini({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
     <div className="kpi-card border rounded-lg px-4 py-3">
@@ -572,7 +579,7 @@ export function Step4MicroSlotting() {
                   <KPIMini label="Optimizado" value={resultsByStorage[st]?.kpi?.optimized ? "Sí" : "No"} />
                   <div className="col-span-2 lg:col-span-4 flex items-center gap-2">
                     <Badge variant="destructive" className="text-orange-600 bg-orange-100 border-orange-300 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800">
-                      Aire Desperdiciado Total: {(resultsByStorage[st]?.kpi?.total_wasted_vol ?? 0).toFixed(2)} m³
+                      Aire Desperdiciado Total: {formatNum(resultsByStorage[st]?.kpi?.total_wasted_vol)} m³
                     </Badge>
                   </div>
                 </div>
@@ -653,13 +660,13 @@ export function Step4MicroSlotting() {
                                           m.used_weight > m.max_weight && m.max_weight > 0 ? "destructive" : "secondary"
                                         }
                                       >
-                                        Peso: {m.used_weight} / {m.max_weight} kg
+                                        Peso: {formatNum(m.used_weight)} / {formatNum(m.max_weight)} kg
                                       </Badge>
                                       <Badge variant="secondary">
-                                        Superficie: {m.used_surface} / {m.max_surface} m²
+                                        Superficie: {formatNum(m.used_surface)} / {formatNum(m.max_surface)} m²
                                       </Badge>
                                       <Badge variant="secondary">
-                                        Volumen: {m.used_volume} / {m.max_volume} m³
+                                        Volumen: {formatNum(m.used_volume)} / {formatNum(m.max_volume)} m³
                                       </Badge>
                                     </div>
                                   </div>
@@ -681,10 +688,10 @@ export function Step4MicroSlotting() {
                                         <TableRow key={`${item?.sku ?? ""}-${itemIdx}`}>
                                           <TableCell className="font-medium">{item?.sku ?? "-"}</TableCell>
                                           <TableCell>{item?.description ?? ""}</TableCell>
-                                          <TableCell className="text-right">{item?.weight ?? "-"}</TableCell>
-                                          <TableCell className="text-right">{item?.surface ?? "-"}</TableCell>
-                                          <TableCell className="text-right">{item?.volume ?? "-"}</TableCell>
-                                          <TableCell className="text-right">{item?.replenishment_units ?? "-"}</TableCell>
+                                          <TableCell className="text-right">{formatNum(item?.weight)}</TableCell>
+                                          <TableCell className="text-right">{formatNum(item?.surface)}</TableCell>
+                                          <TableCell className="text-right">{formatNum(item?.volume)}</TableCell>
+                                          <TableCell className="text-right">{formatNum(item?.replenishment_units)}</TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
