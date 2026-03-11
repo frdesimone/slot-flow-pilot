@@ -524,7 +524,7 @@ export function Step2DataAudit() {
       )}
 
       {hasResults && auditResults?.summary && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 animate-slide-in mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 animate-slide-in mb-6">
           {[
             { label: "Total SKUs", value: formatNum((auditResults.summary as Record<string, unknown>).total_skus) },
             { label: "Total Pedidos", value: formatNum((auditResults.summary as Record<string, unknown>).total_pedidos) },
@@ -532,6 +532,7 @@ export function Step2DataAudit() {
             { label: "Total Líneas", value: formatNum((auditResults.summary as Record<string, unknown>).total_lineas) },
             { label: "Líneas / Pedido", value: formatNum((auditResults.summary as Record<string, unknown>).lineas_por_pedido) },
             { label: "Total KG", value: `${formatNum((auditResults.summary as Record<string, unknown>).total_kg)} kg` },
+            { label: "Total m³", value: `${formatNum((auditResults.summary as Record<string, unknown>).total_m3)} m³` },
           ].map((stat, i) => (
             <Card key={i} className="border bg-slate-50/50 dark:bg-slate-800/50">
               <CardContent className="p-4 flex flex-col items-center justify-center text-center">

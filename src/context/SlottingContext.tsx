@@ -72,8 +72,20 @@ export interface DataValidationRaw {
   sample_data?: Record<string, unknown>[];
 }
 
+/** Resumen global de la auditoría de datos */
+export interface AuditSummary {
+  total_skus?: number;
+  total_pedidos?: number;
+  total_unidades?: number;
+  total_lineas?: number;
+  lineas_por_pedido?: number;
+  total_kg?: number;
+  total_m3?: number;
+}
+
 /** Respuesta cruda de la API de outliers (formato dinámico por categorías) */
 export interface AuditResultsRaw {
+  summary?: AuditSummary;
   categories?: AuditCategory[];
   validation?: {
     maestro?: DataValidationRaw | null;
