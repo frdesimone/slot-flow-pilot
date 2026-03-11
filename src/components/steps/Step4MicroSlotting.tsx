@@ -242,8 +242,7 @@ export function Step4MicroSlotting() {
         ? Number(firstMacroStorage.cycle_days)
         : Number(state.coverageDays) || 15;
 
-      const payload = {
-        storages,
+      const basePayload = {
         sku_storage_mapping,
         weights: {
           affinity: weights.affinity / 100,
@@ -259,72 +258,84 @@ export function Step4MicroSlotting() {
         vlm_skus_ids: vlmSkusIds,
       };
 
-      const formData = new FormData();
-      formData.append("file", state.dataFile);
-      formData.append("payload", JSON.stringify(payload));
+      let accumulatedResultsByStorage: Record<string, unknown> = {};
+      const totalStorages = storages.length;
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/micro`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-        },
-        body: formData,
-      });
+      for (let i = 0; i < storages.length; i++) {
+        const storage = storages[i];
+        const storageName = storage.storage_type ?? storage.storageType ?? `Storage-${i + 1}`;
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(errText || "Error al ejecutar Micro-Slotting");
+        toast({
+          title: `Procesando equipo ${i + 1}/${totalStorages}`,
+          description: `${storageName}...`,
+        });
+
+        const payload = {
+          ...basePayload,
+          storages: [storage],
+        };
+
+        const formData = new FormData();
+        formData.append("file", state.dataFile);
+        formData.append("payload", JSON.stringify(payload));
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/micro`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Error procesando ${storageName}: ${errText || response.statusText}`);
+        }
+
+        const raw = await response.json();
+        const resultsByStorage = raw?.results_by_storage ?? raw?.data?.results_by_storage ?? {};
+        accumulatedResultsByStorage = { ...accumulatedResultsByStorage, ...resultsByStorage };
       }
 
-      let data: import("@/context/SlottingContext").MicroResult;
-      try {
-        const raw = await response.json();
-        const dataObj = raw?.data ?? raw;
-        const resultsByStorage = raw?.results_by_storage ?? dataObj?.results_by_storage ?? {};
-        let bestTrays: import("@/context/SlottingContext").BestTrayItem[] = [];
-        let totalTrays = 0;
-        let skusPlaced = 0;
-        const occList: number[] = [];
-        for (const st of Object.keys(resultsByStorage)) {
-          const r = resultsByStorage[st];
-          const trays = Array.isArray(r?.best_trays) ? r.best_trays : [];
-          bestTrays = bestTrays.concat(trays);
-          if (r?.kpi) {
-            totalTrays += r.kpi.total_trays ?? 0;
-            skusPlaced += r.kpi.skus_placed ?? 0;
-            if ((r.kpi.total_trays ?? 0) > 0) occList.push(r.kpi.avg_area_occupancy_pct ?? 0);
+      let bestTrays: import("@/context/SlottingContext").BestTrayItem[] = [];
+      let totalTrays = 0;
+      let skusPlaced = 0;
+      const occList: number[] = [];
+      for (const st of Object.keys(accumulatedResultsByStorage)) {
+        const r = accumulatedResultsByStorage[st] as Record<string, unknown>;
+        const trays = Array.isArray(r?.best_trays) ? r.best_trays : (Array.isArray(r?.locations) ? r.locations : []);
+        bestTrays = bestTrays.concat(trays as import("@/context/SlottingContext").BestTrayItem[]);
+        const kpi = r?.kpi as Record<string, unknown> | undefined;
+        if (kpi) {
+          totalTrays += (kpi.total_trays as number) ?? 0;
+          skusPlaced += (kpi.skus_placed as number) ?? 0;
+          if (((kpi.total_trays as number) ?? 0) > 0) {
+            occList.push((kpi.avg_area_occupancy_pct as number) ?? 0);
           }
         }
-        if (bestTrays.length === 0 && Array.isArray(dataObj?.best_trays)) {
-          bestTrays = dataObj.best_trays;
-        }
-        const kpi = raw?.kpi ?? dataObj?.kpi ?? {};
-        data = {
-          best_trays: bestTrays,
-          results_by_storage: resultsByStorage,
-          kpi: {
-            total_trays: totalTrays || (typeof kpi?.total_trays === "number" ? kpi.total_trays : 0),
-            skus_placed: skusPlaced || (typeof kpi?.skus_placed === "number" ? kpi.skus_placed : 0),
-            avg_area_occupancy_pct: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : (typeof kpi?.avg_area_occupancy_pct === "number" ? kpi.avg_area_occupancy_pct : 0),
-            optimized: Boolean(kpi?.optimized),
-          },
-          heightEfficiency: typeof raw?.heightEfficiency === "number" ? raw.heightEfficiency : (occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0),
-          areaEfficiency: typeof raw?.areaEfficiency === "number" ? raw.areaEfficiency : (occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0),
-          avgTraysPerOrder: typeof raw?.avgTraysPerOrder === "number" ? raw.avgTraysPerOrder : 0,
-          replicationCoverage: typeof raw?.replicationCoverage === "number" ? raw.replicationCoverage : 0,
-        };
-      } catch (parseError) {
-        console.error(parseError);
-        toast({
-          title: "Error al interpretar la respuesta",
-          description: parseError instanceof Error ? parseError.message : "La API devolvió datos no válidos.",
-          variant: "destructive",
-        });
-        return;
       }
+
+      const data: import("@/context/SlottingContext").MicroResult = {
+        best_trays: bestTrays,
+        results_by_storage: accumulatedResultsByStorage as Record<string, { kpi?: Record<string, unknown>; locations?: unknown[]; best_trays?: unknown[] }>,
+        kpi: {
+          total_trays: totalTrays,
+          skus_placed: skusPlaced,
+          avg_area_occupancy_pct: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
+          optimized: true,
+        },
+        heightEfficiency: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
+        areaEfficiency: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
+        avgTraysPerOrder: 0,
+        replicationCoverage: 0,
+      };
 
       updateState({ microResult: data });
       completeStep(3);
+      toast({
+        title: "Micro-Slotting completado",
+        description: `${totalStorages} equipo(s) procesado(s). ${totalTrays} bandejas asignadas.`,
+      });
     } catch (error) {
       console.error(error);
       const err = error instanceof Error ? error : new Error(String(error));
