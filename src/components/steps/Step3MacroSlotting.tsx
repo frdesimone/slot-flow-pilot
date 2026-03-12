@@ -804,7 +804,7 @@ export function Step3MacroSlotting() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>
+                      <TableHead className="py-1 h-auto text-xs">
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
@@ -813,7 +813,7 @@ export function Step3MacroSlotting() {
                           SKU <SortIcon col="sku_id" />
                         </button>
                       </TableHead>
-                      <TableHead>
+                      <TableHead className="py-1 h-auto text-xs">
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
@@ -822,7 +822,7 @@ export function Step3MacroSlotting() {
                           Descripción <SortIcon col="description" />
                         </button>
                       </TableHead>
-                      <TableHead>
+                      <TableHead className="py-1 h-auto text-xs">
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
@@ -831,7 +831,7 @@ export function Step3MacroSlotting() {
                           Storage Type <SortIcon col="storage_type" />
                         </button>
                       </TableHead>
-                      <TableHead>
+                      <TableHead className="py-1 h-auto text-xs">
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
@@ -840,8 +840,8 @@ export function Step3MacroSlotting() {
                           Categoría <SortIcon col="category" />
                         </button>
                       </TableHead>
-                      <TableHead>Dimensiones en cm (L x A x H)</TableHead>
-                      <TableHead>
+                      <TableHead className="py-1 h-auto text-xs">Dimensiones en cm (L x A x H)</TableHead>
+                      <TableHead className="py-1 h-auto text-xs">
                         <button
                           type="button"
                           className="flex items-center gap-1 hover:text-foreground font-medium"
@@ -849,9 +849,9 @@ export function Step3MacroSlotting() {
                         >
                           Unid. Reposición <SortIcon col="replenishment_units" />
                         </button>
-                          </TableHead>
-                      <TableHead>Vol. Total (m³)</TableHead>
-                      <TableHead>Peso Total (KG)</TableHead>
+                      </TableHead>
+                      <TableHead className="py-1 h-auto text-xs">Vol. Total (m³)</TableHead>
+                      <TableHead className="py-1 h-auto text-xs">Peso Total (KG)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -859,40 +859,31 @@ export function Step3MacroSlotting() {
                       const skuId = row?.sku_id ?? `row-${rowIdx}`;
                       return (
                         <TableRow key={skuId}>
-                          <TableCell className="font-mono text-sm">{row?.sku_id ?? "—"}</TableCell>
-                          <TableCell className="text-sm max-w-[200px] truncate" title={row?.description ?? ""}>
+                          <TableCell className="py-1 h-auto text-xs font-mono">{row?.sku_id ?? "—"}</TableCell>
+                          <TableCell className="py-1 h-auto text-xs max-w-[200px] truncate" title={row?.description ?? ""}>
                             {row?.description || "—"}
-                            </TableCell>
-                          <TableCell>
-                            <Select
-                              value={row?.storage_type ?? ""}
-                              onValueChange={(v) => updateTableStorageType(skuId, v)}
-                            >
-                              <SelectTrigger className="h-8 text-xs min-w-[100px]">
+                          </TableCell>
+                          <TableCell className="py-1 h-auto text-xs">
+                            <Select value={row?.storage_type ?? ""} onValueChange={(v) => updateTableStorageType(skuId, v)}>
+                              <SelectTrigger className="h-7 text-[11px] min-w-[100px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {(storageTypeOptions ?? []).map((opt, optIdx) => (
-                                  <SelectItem key={opt ?? `opt-${optIdx}`} value={opt ?? ""} className="text-xs">
+                                  <SelectItem key={opt ?? `opt-${optIdx}`} value={opt ?? ""} className="text-[11px]">
                                     {opt ?? ""}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell className="text-sm">{row?.category || "—"}</TableCell>
-                          <TableCell className="text-sm tabular-nums font-mono">
+                          <TableCell className="py-1 h-auto text-xs">{row?.category || "—"}</TableCell>
+                          <TableCell className="py-1 h-auto text-xs tabular-nums font-mono">
                             {formatNum(row?.length)} x {formatNum(row?.width)} x {formatNum(row?.height)}
                           </TableCell>
-                          <TableCell className="text-sm tabular-nums text-right">
-                            {formatNum(row?.replenishment_units)}
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums text-right">
-                            {formatNum(row?.total_vol)}
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums text-right">
-                            {formatNum(row?.total_weight)}
-                          </TableCell>
+                          <TableCell className="py-1 h-auto text-xs tabular-nums text-right">{formatNum(row?.replenishment_units)}</TableCell>
+                          <TableCell className="py-1 h-auto text-xs tabular-nums text-right">{formatNum(row?.total_vol)}</TableCell>
+                          <TableCell className="py-1 h-auto text-xs tabular-nums text-right">{formatNum(row?.total_weight)}</TableCell>
                         </TableRow>
                       );
                     })}

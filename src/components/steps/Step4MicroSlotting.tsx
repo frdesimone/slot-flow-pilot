@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatNum } from "@/lib/utils";
+import { cn, formatNum } from "@/lib/utils";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
 
@@ -72,9 +72,9 @@ function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
     if (items.length === 0) {
       rows.push([
         String(loc?.location_id ?? ""),
-        `${m.used_weight}/${m.max_weight}`,
-        `${m.used_surface}/${m.max_surface}`,
-        `${m.used_volume}/${m.max_volume}`,
+        `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
+        `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
+        `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
         "",
         "",
         "",
@@ -83,12 +83,12 @@ function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
         "",
       ]);
     } else {
-      items.forEach((item, idx) => {
+      items.forEach((item) => {
         rows.push([
-          idx === 0 ? String(loc?.location_id ?? "") : "",
-          idx === 0 ? `${m.used_weight}/${m.max_weight}` : "",
-          idx === 0 ? `${m.used_surface}/${m.max_surface}` : "",
-          idx === 0 ? `${m.used_volume}/${m.max_volume}` : "",
+          String(loc?.location_id ?? ""),
+          `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
+          `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
+          `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
           String(item?.sku ?? ""),
           String(item?.description ?? ""),
           String(item?.weight ?? ""),
@@ -359,7 +359,9 @@ export function Step4MicroSlotting() {
   const micro = state.microResult;
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const [itemsPerPage] = useState(30);
+  const [draggedSku, setDraggedSku] = useState<{ sourceLocId: string; itemIdx: number; item: Record<string, unknown> } | null>(null);
+  const [dragOverTray, setDragOverTray] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("occupancy_desc");
   const [activeStorageTab, setActiveStorageTab] = useState("");
@@ -441,6 +443,51 @@ export function Step4MicroSlotting() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  const handleMoveSku = (dragged: { sourceLocId: string; itemIdx: number; item: Record<string, unknown> }, targetLocId: string) => {
+    if (!micro) return;
+    const newResults = { ...micro.results_by_storage };
+    const currentStorageData = newResults[effectiveActiveTab] as Record<string, unknown> | undefined;
+    if (!currentStorageData) return;
+    const locs = (currentStorageData.locations || currentStorageData.best_trays || []) as MicroLocation[];
+    const newLocs = [...locs];
+    const sourceIdx = newLocs.findIndex((l) => l.location_id === dragged.sourceLocId);
+    const targetIdx = newLocs.findIndex((l) => l.location_id === targetLocId);
+    if (sourceIdx === -1 || targetIdx === -1) return;
+    const sourceLoc = { ...newLocs[sourceIdx] };
+    const targetLoc = { ...newLocs[targetIdx] };
+    const itemToMove = sourceLoc.items?.[dragged.itemIdx] as Record<string, unknown> | undefined;
+    if (!itemToMove) return;
+    const newSourceItems = [...(sourceLoc.items ?? [])];
+    newSourceItems.splice(dragged.itemIdx, 1);
+    sourceLoc.items = newSourceItems;
+    const srcMetrics = sourceLoc.metrics ?? { used_weight: 0, used_surface: 0, used_volume: 0, max_surface: 1 };
+    sourceLoc.metrics = {
+      ...srcMetrics,
+      used_weight: Math.max(0, (srcMetrics.used_weight ?? 0) - Number(itemToMove.weight ?? 0)),
+      used_surface: Math.max(0, (srcMetrics.used_surface ?? 0) - Number(itemToMove.surface ?? 0)),
+      used_volume: Math.max(0, (srcMetrics.used_volume ?? 0) - Number(itemToMove.volume ?? 0)),
+    };
+    sourceLoc.occupancy_pct = (sourceLoc.metrics.max_surface ?? 0) > 0
+      ? ((sourceLoc.metrics.used_surface ?? 0) / (sourceLoc.metrics.max_surface ?? 1)) * 100
+      : 0;
+    targetLoc.items = [...(targetLoc.items ?? []), itemToMove];
+    const tgtMetrics = targetLoc.metrics ?? { used_weight: 0, used_surface: 0, used_volume: 0, max_surface: 1 };
+    targetLoc.metrics = {
+      ...tgtMetrics,
+      used_weight: (tgtMetrics.used_weight ?? 0) + Number(itemToMove.weight ?? 0),
+      used_surface: (tgtMetrics.used_surface ?? 0) + Number(itemToMove.surface ?? 0),
+      used_volume: (tgtMetrics.used_volume ?? 0) + Number(itemToMove.volume ?? 0),
+    };
+    targetLoc.occupancy_pct = (targetLoc.metrics.max_surface ?? 0) > 0
+      ? ((targetLoc.metrics.used_surface ?? 0) / (targetLoc.metrics.max_surface ?? 1)) * 100
+      : 0;
+    newLocs[sourceIdx] = sourceLoc;
+    newLocs[targetIdx] = targetLoc;
+    if (currentStorageData.locations) currentStorageData.locations = newLocs;
+    else if (currentStorageData.best_trays) currentStorageData.best_trays = newLocs;
+    updateState({ microResult: { ...micro, results_by_storage: newResults } });
+  };
 
   return (
     <div className="space-y-8 pb-20">
@@ -653,7 +700,22 @@ export function Step4MicroSlotting() {
                             };
                             const items = location?.items ?? [];
                             return (
-                              <Card key={location?.location_id ?? idx} className="mb-3 overflow-hidden shadow-sm">
+                              <Card
+                                key={location?.location_id ?? idx}
+                                className={cn(
+                                  "mb-3 overflow-hidden shadow-sm transition-all duration-200 border-2",
+                                  dragOverTray === (location?.location_id ?? `loc-${idx}`) ? "border-primary bg-primary/5 ring-4 ring-primary/20 scale-[1.01]" : "border-transparent"
+                                )}
+                                onDragOver={(e) => { e.preventDefault(); setDragOverTray(location?.location_id ?? `loc-${idx}`); }}
+                                onDragLeave={() => setDragOverTray(null)}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  setDragOverTray(null);
+                                  if (!draggedSku || !location?.location_id) return;
+                                  if (draggedSku.sourceLocId === location.location_id) return;
+                                  handleMoveSku(draggedSku, location.location_id);
+                                }}
+                              >
                                 <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b py-2 px-4">
                                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
                                     <CardTitle className="text-sm font-bold">
@@ -689,7 +751,17 @@ export function Step4MicroSlotting() {
                                     </TableHeader>
                                     <TableBody>
                                       {items.map((item, itemIdx) => (
-                                        <TableRow key={`${item?.sku ?? ""}-${itemIdx}`}>
+                                        <TableRow
+                                          key={`${item?.sku ?? ""}-${itemIdx}`}
+                                          draggable
+                                          onDragStart={() => {
+                                            if (location?.location_id) {
+                                              setDraggedSku({ sourceLocId: location.location_id, itemIdx, item: item as Record<string, unknown> });
+                                            }
+                                          }}
+                                          onDragEnd={() => setDraggedSku(null)}
+                                          className="cursor-grab active:cursor-grabbing hover:bg-muted/60 transition-colors"
+                                        >
                                           <TableCell className="py-1 text-xs font-medium">{item?.sku ?? "-"}</TableCell>
                                           <TableCell className="py-1 text-xs">{item?.description ?? ""}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.weight)}</TableCell>
