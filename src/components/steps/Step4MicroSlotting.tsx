@@ -641,7 +641,7 @@ export function Step4MicroSlotting() {
                       </div>
                     ) : (
                       <>
-                        <div className="space-y-6">
+                        <div className="space-y-3">
                           {paginatedLocations.map((location, idx) => {
                             const m = location?.metrics ?? {
                               used_weight: 0,
@@ -653,24 +653,23 @@ export function Step4MicroSlotting() {
                             };
                             const items = location?.items ?? [];
                             return (
-                              <Card key={location?.location_id ?? idx} className="mb-6 overflow-hidden">
-                                <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b">
-                                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                    <CardTitle className="text-lg">
+                              <Card key={location?.location_id ?? idx} className="mb-3 overflow-hidden shadow-sm">
+                                <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b py-2 px-4">
+                                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                                    <CardTitle className="text-sm font-bold">
                                       Ubicación: {location?.location_id ?? `Loc-${idx + 1}`}
                                     </CardTitle>
-                                    <div className="flex flex-wrap gap-3">
+                                    <div className="flex flex-wrap gap-2">
                                       <Badge
-                                        variant={
-                                          m.used_weight > m.max_weight && m.max_weight > 0 ? "destructive" : "secondary"
-                                        }
+                                        variant={m.used_weight > m.max_weight && m.max_weight > 0 ? "destructive" : "secondary"}
+                                        className="text-[10px] px-1.5 py-0 h-4"
                                       >
                                         Peso: {formatNum(m.used_weight)} / {formatNum(m.max_weight)} kg
                                       </Badge>
-                                      <Badge variant="secondary">
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                                         Superficie: {formatNum(m.used_surface)} / {formatNum(m.max_surface)} m²
                                       </Badge>
-                                      <Badge variant="secondary">
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
                                         Volumen: {formatNum(m.used_volume)} / {formatNum(m.max_volume)} m³
                                       </Badge>
                                     </div>
@@ -680,23 +679,23 @@ export function Step4MicroSlotting() {
                                   <Table>
                                     <TableHeader className="bg-muted/50">
                                       <TableRow>
-                                        <TableHead>SKU</TableHead>
-                                        <TableHead>Descripción</TableHead>
-                                        <TableHead className="text-right">Peso (KG)</TableHead>
-                                        <TableHead className="text-right">Superficie (m²)</TableHead>
-                                        <TableHead className="text-right">Volumen (m³)</TableHead>
-                                        <TableHead className="text-right">Unid. Reposición</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs">SKU</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs">Descripción</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs text-right">Peso (KG)</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs text-right">Superficie (m²)</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs text-right">Volumen (m³)</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs text-right">Unid. Reposición</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                       {items.map((item, itemIdx) => (
                                         <TableRow key={`${item?.sku ?? ""}-${itemIdx}`}>
-                                          <TableCell className="font-medium">{item?.sku ?? "-"}</TableCell>
-                                          <TableCell>{item?.description ?? ""}</TableCell>
-                                          <TableCell className="text-right">{formatNum(item?.weight)}</TableCell>
-                                          <TableCell className="text-right">{formatNum(item?.surface)}</TableCell>
-                                          <TableCell className="text-right">{formatNum(item?.volume)}</TableCell>
-                                          <TableCell className="text-right">{formatNum(item?.replenishment_units)}</TableCell>
+                                          <TableCell className="py-1 text-xs font-medium">{item?.sku ?? "-"}</TableCell>
+                                          <TableCell className="py-1 text-xs">{item?.description ?? ""}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.weight)}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.surface)}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.volume)}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.replenishment_units)}</TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
