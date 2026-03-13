@@ -610,16 +610,20 @@ export function Step4MicroSlotting() {
       {micro && storageTabKeys.length > 0 && (
         <div className="space-y-6 animate-slide-in">
           <Tabs value={effectiveActiveTab} onValueChange={setActiveStorageTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 max-w-md lg:grid-cols-4">
+            <TabsList className="flex flex-wrap w-full h-auto p-1 gap-1">
               {storageTabKeys.map((st) => (
-                <TabsTrigger key={st} value={st} className="gap-1">
-                  {st}
+                <TabsTrigger
+                  key={st}
+                  value={st}
+                  className="flex-1 min-w-[150px] gap-2 whitespace-normal h-auto py-2 text-sm"
+                >
+                  <span className="font-semibold">{st}</span>
                   <Badge variant="secondary" className="text-[10px]">
                     {(resultsByStorage[st]?.locations ?? resultsByStorage[st]?.best_trays ?? []).length}
                   </Badge>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
             {storageTabKeys.map((st) => (
               <TabsContent key={st} value={st} className="mt-6 space-y-4">
