@@ -667,6 +667,30 @@ export function Step3MacroSlotting() {
                       className="h-9 text-sm"
                     />
                   </div>
+                  <div className="flex flex-row items-center justify-between border rounded-md px-2 h-9 col-span-2 md:col-span-1 mb-[2px]">
+                    <span className="text-[11px] uppercase text-muted-foreground truncate" title="Exigir cantidades enteras de reposición">Cajas Enteras</span>
+                    <Switch
+                      checked={safe.enforce_integer_replenishment}
+                      onCheckedChange={(v) => updateStorageType(idx, "enforce_integer_replenishment", v)}
+                    />
+                  </div>
+                  <div className={cn("flex flex-col gap-0.5", !safe.enforce_integer_replenishment && "opacity-50 pointer-events-none")}>
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate" title="Límite para redondear hacia 1 (ej: 0.25)">
+                      Límite Redondeo
+                    </Label>
+                    <Input
+                      type="number"
+                      step={0.01}
+                      min={0}
+                      max={1}
+                      value={safe.round_to_one_threshold}
+                      onChange={(e) =>
+                        updateStorageType(idx, "round_to_one_threshold", e.target.value === "" ? "" : Number(e.target.value))
+                      }
+                      disabled={!safe.enforce_integer_replenishment}
+                      className="h-9 text-sm"
+                    />
+                  </div>
                   <div className="flex flex-col gap-0.5 col-span-2 md:col-span-2 lg:col-span-1">
                     <Label className="text-[11px] uppercase text-muted-foreground truncate">Categorías</Label>
                     <DropdownMenu>
