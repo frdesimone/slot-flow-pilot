@@ -172,6 +172,8 @@ export function Step4MicroSlotting() {
         cycle_days?: number;
         cycle_vol_limit?: number;
         categories?: string[];
+        enforce_integer_replenishment?: boolean;
+        round_to_one_threshold?: number | string;
       }>;
 
       type StoragePayload = {
@@ -189,6 +191,8 @@ export function Step4MicroSlotting() {
         is_variable_height?: boolean;
         is_multiproduct?: boolean;
         stackability_factor?: number;
+        enforce_integer_replenishment?: boolean;
+        round_to_one_threshold?: number;
       };
 
       const storages: StoragePayload[] =
@@ -215,6 +219,8 @@ export function Step4MicroSlotting() {
                 is_variable_height: isVarH,
                 is_multiproduct: Boolean(st?.is_multiproduct ?? true),
                 stackability_factor: Number(st?.stackability_factor ?? 1) || 1,
+                enforce_integer_replenishment: Boolean(st?.enforce_integer_replenishment ?? false),
+                round_to_one_threshold: Math.max(0, Math.min(1, Number(st?.round_to_one_threshold ?? 0.25) || 0.25)),
               };
             })
           : storageTypeList.map((st) => ({
@@ -224,6 +230,8 @@ export function Step4MicroSlotting() {
               tray_length: 1,
               tray_width: 1,
               is_fixed_height: false,
+              enforce_integer_replenishment: false,
+              round_to_one_threshold: 0.25,
             }));
 
       const sku_storage_mapping: Record<string, string> = {};

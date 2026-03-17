@@ -29,6 +29,8 @@ type MacroStorageType = {
   categories: string[];
   is_multiproduct: boolean;
   stackability_factor: number | string;
+  enforce_integer_replenishment: boolean;
+  round_to_one_threshold: number | string;
 };
 
 type MacroSkuRow = {
@@ -62,6 +64,8 @@ const defaultStorage: MacroStorageType = {
   categories: [],
   is_multiproduct: true,
   stackability_factor: 1,
+  enforce_integer_replenishment: false,
+  round_to_one_threshold: 0.25,
 };
 
 function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknown> | undefined): MacroStorageType {
@@ -85,6 +89,12 @@ function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknow
     categories,
     is_multiproduct: st.is_multiproduct ?? defaultStorage.is_multiproduct,
     stackability_factor: st.stackability_factor ?? defaultStorage.stackability_factor,
+    enforce_integer_replenishment: Boolean(st.enforce_integer_replenishment ?? defaultStorage.enforce_integer_replenishment),
+    round_to_one_threshold: (() => {
+      const v = st.round_to_one_threshold ?? defaultStorage.round_to_one_threshold;
+      const n = typeof v === "number" ? v : parseFloat(String(v));
+      return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.25;
+    })(),
   };
 }
 
@@ -195,6 +205,8 @@ export function Step3MacroSlotting() {
           categories: Array.isArray(safe.categories) ? safe.categories : [],
           is_multiproduct: Boolean(safe.is_multiproduct),
           stackability_factor: Number(safe.stackability_factor) || 1,
+          enforce_integer_replenishment: Boolean(safe.enforce_integer_replenishment),
+          round_to_one_threshold: Math.max(0, Math.min(1, Number(safe.round_to_one_threshold) || 0.25)),
         };
       });
       formData.append("storage_types", JSON.stringify(safeStorageTypes));
@@ -266,6 +278,11 @@ export function Step3MacroSlotting() {
         next[idx] = { ...current, is_variable_height: Boolean(value) };
       } else if (field === "is_multiproduct") {
         next[idx] = { ...current, is_multiproduct: Boolean(value) };
+      } else if (field === "enforce_integer_replenishment") {
+        next[idx] = { ...current, enforce_integer_replenishment: Boolean(value) };
+      } else if (field === "round_to_one_threshold") {
+        const n = typeof value === "number" ? value : parseFloat(String(value));
+        next[idx] = { ...current, round_to_one_threshold: (value === "" || !Number.isFinite(n)) ? (current.round_to_one_threshold ?? 0.25) : Math.max(0, Math.min(1, n)) };
       } else if (typeof value === "number" || value === "") {
         next[idx] = { ...current, [field]: value };
       } else {
