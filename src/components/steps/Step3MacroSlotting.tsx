@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSlotting, type MacroResult } from "@/context/SlottingContext";
-import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronDown } from "lucide-react";
+import { ArrowRight, ArrowLeft, Play, Plus, Trash2, Package, Download, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronDown, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -155,6 +155,7 @@ export function Step3MacroSlotting() {
   });
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isDragEnabled, setIsDragEnabled] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   useEffect(() => {
     setMacroParams((prev) => ({ ...prev, storageTypes }));
@@ -252,6 +253,42 @@ export function Step3MacroSlotting() {
       });
     } finally {
       setIsMacroRunning(false);
+    }
+  };
+
+  const handleRestoreParams = async () => {
+    try {
+      setIsRestoring(true);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/history`, {
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}` },
+      });
+      if (!res.ok) throw new Error("Error al obtener historial");
+      const data = await res.json();
+
+      const lastMacro = data?.macro?.[0];
+      const savedStorages = lastMacro?.params?.storage_types;
+
+      if (Array.isArray(savedStorages) && savedStorages.length > 0) {
+        setStorageTypes(savedStorages.map((st) => ensureStorageType(st)));
+        toast({
+          title: "Parámetros restaurados",
+          description: "Se han cargado los parámetros de la última ejecución.",
+        });
+      } else {
+        toast({
+          title: "No hay parámetros",
+          description: "No se encontraron ejecuciones anteriores de Macro-Slotting.",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "No se pudieron restaurar los parámetros.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -473,11 +510,17 @@ export function Step3MacroSlotting() {
         <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">Tipos de Almacenamiento</h3>
-            <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Arrastrá para reordenar.</p>
+              <p className="text-xs text-muted-foreground">Prioridad 1 = más prioritario. Arrastrá para reordenar.</p>
             </div>
-            <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
-              <Plus className="w-3 h-3" /> Añadir
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={handleRestoreParams} disabled={isRestoring} className="gap-1">
+                {isRestoring ? <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <History className="w-3 h-3" />}
+                Restaurar
+              </Button>
+              <Button size="sm" variant="outline" onClick={addStorageType} className="gap-1">
+                <Plus className="w-3 h-3" /> Añadir
+              </Button>
+            </div>
           </div>
 
         {(storageTypes ?? []).map((st, idx) => {
