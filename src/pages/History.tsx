@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, ArrowLeft, Layers3, LayoutGrid, ExternalLink } from "lucide-react";
+import { Clock, ArrowLeft, Layers3, LayoutGrid, ExternalLink, Download, FileText, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+
+function formatNum(val: unknown): string {
+  if (val == null || isNaN(Number(val))) return "0";
+  return Number(val).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+}
 
 type MacroExecution = {
   execution_id: string;
@@ -67,12 +73,84 @@ function getMacroVlmVolume(output: unknown[] | null): number {
     .reduce((sum, r) => sum + (Number((r as Record<string, unknown>)?.vol_cycle) || 0), 0);
 }
 
+function downloadMacroCSV(outputData: unknown[] | null, dateStr: string) {
+  const safeRows = (outputData ?? []) as Record<string, unknown>[];
+  const headers = ["SKU", "Descripción", "Storage Type", "Categoría", "Dimensiones en cm (L x A x H)", "Unid. Reposición", "Vol. Total (m³)", "Peso Total (KG)"];
+  const csvRows = safeRows.map((r) => [
+    r?.sku_id ?? "",
+    r?.description ?? "",
+    r?.storage_type ?? "",
+    r?.category ?? "",
+    [r?.length, r?.width, r?.height].map((v) => (v != null ? String(v) : "-")).join(" x "),
+    r?.replenishment_units != null ? Number(r.replenishment_units).toFixed(1) : "-",
+    r?.total_vol != null ? Number(r.total_vol).toFixed(4) : "-",
+    r?.total_weight != null ? Number(r.total_weight).toFixed(2) : "-",
+  ]);
+  const csv = [headers.join(","), ...csvRows.map((r) => r.map((c) => (String(c).includes(",") || String(c).includes('"') ? `"${String(c).replace(/"/g, '""')}"` : c)).join(","))].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `macro_history_${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadMicroCSV(outputData: unknown[] | null, dateStr: string) {
+  const locs = (outputData ?? []) as Record<string, unknown>[];
+  const rows: string[][] = [
+    ["Location ID", "Peso (kg)", "Superficie (m²)", "Volumen (m³)", "SKU", "Descripción", "Peso (KG)", "Superficie (m²)", "Volumen (m³)", "Unid. Reposición"],
+  ];
+  locs.forEach((loc) => {
+    const items = (loc?.items ?? []) as Record<string, unknown>[];
+    const m = (loc?.metrics ?? { used_weight: 0, max_weight: 0, used_surface: 0, max_surface: 0, used_volume: 0, max_volume: 0 }) as Record<string, number>;
+    if (items.length === 0) {
+      rows.push([
+        String(loc?.location_id ?? ""),
+        `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
+        `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
+        `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
+    } else {
+      items.forEach((item: Record<string, unknown>) => {
+        rows.push([
+          String(loc?.location_id ?? ""),
+          `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
+          `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
+          `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
+          String(item?.sku ?? ""),
+          String(item?.description ?? ""),
+          String(item?.weight ?? ""),
+          String(item?.surface ?? ""),
+          String(item?.volume ?? ""),
+          String(item?.replenishment_units ?? ""),
+        ]);
+      });
+    }
+  });
+  const csv = rows.map((r) => r.map((c) => (c.includes(",") || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `micro_history_${dateStr}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function History() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HistoryResponse | null>(null);
+  const [selectedExec, setSelectedExec] = useState<{ type: "macro" | "micro"; data: MacroExecution | MicroExecution } | null>(null);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -104,8 +182,8 @@ export default function History() {
     fetchHistory();
   }, [toast]);
 
-  const handleVerDetalles = (exec: MacroExecution | MicroExecution) => {
-    console.log("output_data:", exec.output_data);
+  const handleVerDetalles = (type: "macro" | "micro", exec: MacroExecution | MicroExecution) => {
+    setSelectedExec({ type, data: exec });
   };
 
   return (
@@ -195,7 +273,7 @@ export default function History() {
                               variant="outline"
                               size="sm"
                               className="gap-1"
-                              onClick={() => handleVerDetalles(exec)}
+                              onClick={() => handleVerDetalles("macro", exec)}
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                               Ver Detalles
@@ -246,7 +324,7 @@ export default function History() {
                             variant="outline"
                             size="sm"
                             className="gap-1"
-                            onClick={() => handleVerDetalles(exec)}
+                            onClick={() => handleVerDetalles("micro", exec)}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             Ver Detalles
@@ -260,6 +338,59 @@ export default function History() {
             </TabsContent>
           </Tabs>
         )}
+
+      <Dialog open={!!selectedExec} onOpenChange={(open) => !open && setSelectedExec(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Detalles de Ejecución ({selectedExec?.type?.toUpperCase()})
+            </DialogTitle>
+            <DialogDescription>
+              ID: {selectedExec?.data.execution_id} • Fecha: {formatDate(selectedExec?.data.created_at)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto mt-4 pr-2 space-y-4">
+            <h4 className="text-sm font-semibold flex items-center gap-2 border-b pb-2">
+              <Settings2 className="w-4 h-4" />
+              Parámetros Utilizados
+            </h4>
+            <div className="bg-muted/50 p-4 rounded-md text-xs font-mono whitespace-pre-wrap break-all">
+              {JSON.stringify(selectedExec?.data.params, null, 2)}
+            </div>
+            <h4 className="text-sm font-semibold flex items-center gap-2 border-b pb-2 mt-6">
+              <Layers3 className="w-4 h-4" />
+              Resultados y Exportación
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              {selectedExec?.type === "macro"
+                ? `Se procesaron y asignaron ${selectedExec?.data.output_data?.length ?? 0} SKUs en esta ejecución.`
+                : `Se generaron ${selectedExec?.data.output_data?.length ?? 0} ubicaciones/bandejas físicas.`}
+              <br />
+              Haz clic en el botón de abajo para obtener el detalle minucioso completo.
+            </p>
+          </div>
+          <DialogFooter className="mt-4 border-t pt-4 flex sm:justify-between items-center">
+            <Button variant="outline" onClick={() => setSelectedExec(null)}>
+              Cerrar
+            </Button>
+            <Button
+              className="gap-2"
+              onClick={() => {
+                const dStr = (selectedExec?.data.created_at || new Date().toISOString()).slice(0, 10);
+                if (selectedExec?.type === "macro") {
+                  downloadMacroCSV(selectedExec.data.output_data, dStr);
+                } else {
+                  downloadMicroCSV(selectedExec.data.output_data, dStr);
+                }
+              }}
+            >
+              <Download className="w-4 h-4" />
+              Descargar CSV Completo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
