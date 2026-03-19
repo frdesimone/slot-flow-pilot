@@ -184,6 +184,7 @@ export function Step3MacroSlotting() {
       const hasExclusions = excludeOutliers && (selectedSkus.length > 0 || selectedOrders.length > 0);
 
       formData.append("exclude_outliers", hasExclusions ? "true" : "false");
+      formData.append("include_zero_rot", state.includeNoRotation ? "true" : "false");
       formData.append("excluded_skus", JSON.stringify(selectedSkus));
       formData.append("excluded_orders", JSON.stringify(selectedOrders));
 

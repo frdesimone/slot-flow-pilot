@@ -298,7 +298,7 @@ const initialState: SlottingState = {
   clusteringMethod: "jaccard",
   affinityThreshold: 0.15,
   topK: 30,
-  includeNoRotation: false,
+  includeNoRotation: true,
   replicationFactor: 2,
   microResult: null,
 };

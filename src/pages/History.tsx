@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, ArrowLeft, Layers3, LayoutGrid, ExternalLink, Download, FileText, Settings2 } from "lucide-react";
+import { Clock, ArrowLeft, Layers3, LayoutGrid, ExternalLink, Download, FileText, Settings2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,15 @@ import { useToast } from "@/components/ui/use-toast";
 function formatNum(val: unknown): string {
   if (val == null || isNaN(Number(val))) return "0";
   return Number(val).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+}
+
+/** Pesos guardados como fracción 0–1 en API Micro → porcentaje entero para la UI */
+function formatHistoryWeightPct(val: unknown): string {
+  if (val == null) return "—";
+  const n = Number(val);
+  if (!Number.isFinite(n)) return "—";
+  if (n > 0 && n <= 1) return String(Math.round(n * 100));
+  return String(n);
 }
 
 type MacroExecution = {
@@ -355,9 +364,63 @@ export default function History() {
               <Settings2 className="w-4 h-4" />
               Parámetros Utilizados
             </h4>
-            <div className="bg-muted/50 p-4 rounded-md text-xs font-mono whitespace-pre-wrap break-all">
-              {JSON.stringify(selectedExec?.data.params, null, 2)}
-            </div>
+            {/* Nueva vista interactiva en lugar de JSON crudo */}
+            {selectedExec?.type === "macro" && (
+              <div className="space-y-3">
+                {(selectedExec.data.params as Record<string, unknown> & { storage_types?: Record<string, unknown>[] } | null)?.storage_types?.map((st, i) => (
+                  <Card key={i} className="bg-muted/30 shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="font-bold text-sm mb-3 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-primary" /> {String(st.name ?? `Equipo ${i + 1}`)}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-3 gap-x-2 text-xs">
+                        <div><span className="text-muted-foreground block mb-0.5">Prioridad:</span> {String(st.priority ?? "")}</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Ubicaciones:</span> {String(st.num_locations ?? "")}</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Dimensiones:</span> {st.max_l}x{st.max_w}x{st.is_variable_height ? "Var" : st.max_h_loc}m</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Peso Máx:</span> {st.max_weight_loc} kg</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Ocupación Obj:</span> {st.occupancy_pct}%</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Días Ciclo:</span> {String(st.cycle_days ?? "")}</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Vol. Límite:</span> {st.cycle_vol_limit} m³</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Mezcla (Multiprod):</span> {st.is_multiproduct ? "Sí" : "No"}</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Apilabilidad:</span> {String(st.stackability_factor ?? "")}</div>
+                        <div><span className="text-muted-foreground block mb-0.5">Cajas Enteras:</span> {st.enforce_integer_replenishment ? "Sí" : "No"}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {selectedExec?.type === "micro" && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-6 text-sm bg-primary/5 p-4 rounded-lg border border-primary/20">
+                  <div><span className="text-muted-foreground font-medium">Afinidad:</span> <span className="font-bold">{formatHistoryWeightPct((selectedExec.data.params as Record<string, unknown> | null)?.weight_affinity)}%</span></div>
+                  <div><span className="text-muted-foreground font-medium">Rotación:</span> <span className="font-bold">{formatHistoryWeightPct((selectedExec.data.params as Record<string, unknown> | null)?.weight_rotation)}%</span></div>
+                  <div><span className="text-muted-foreground font-medium">Altura:</span> <span className="font-bold">{formatHistoryWeightPct((selectedExec.data.params as Record<string, unknown> | null)?.weight_height)}%</span></div>
+                  <div><span className="text-muted-foreground font-medium">Días Ciclo:</span> <span className="font-bold">{String((selectedExec.data.params as Record<string, unknown> | null)?.cycle_days ?? "—")}</span></div>
+                </div>
+                <div className="space-y-3">
+                  {(selectedExec.data.params as Record<string, unknown> & { storages?: Record<string, unknown>[] } | null)?.storages?.map((st, i) => (
+                    <Card key={i} className="bg-muted/30 shadow-sm border-l-4 border-l-primary">
+                      <CardContent className="p-4">
+                        <div className="font-bold text-sm mb-3 flex items-center gap-2">
+                          <Package className="w-4 h-4 text-primary" /> {String(st.storage_type ?? `Equipo ${i + 1}`)}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-2 text-xs">
+                          <div><span className="text-muted-foreground block mb-0.5">Máx Bandejas:</span> {st.max_trays}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Dimensión:</span> {st.tray_length}x{st.tray_width}x{st.is_variable_height ? "Var" : st.max_h_loc}m</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Peso Máx:</span> {st.max_weight} kg</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Multiproducto:</span> {st.is_multiproduct ? "Sí" : "No"}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Apilabilidad:</span> {st.stackability_factor}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Cajas Enteras:</span> {st.enforce_integer_replenishment ? "Sí" : "No"}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Lím. Redondeo:</span> {st.round_to_one_threshold}</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
             <h4 className="text-sm font-semibold flex items-center gap-2 border-b pb-2 mt-6">
               <Layers3 className="w-4 h-4" />
               Resultados y Exportación
