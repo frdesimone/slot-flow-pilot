@@ -268,6 +268,7 @@ export function Step4MicroSlotting() {
 
       let accumulatedResultsByStorage: Record<string, unknown> = {};
       const totalStorages = storages.length;
+      let currentSpillover: string[] = [];
 
       for (let i = 0; i < storages.length; i++) {
         const storage = storages[i];
@@ -278,8 +279,15 @@ export function Step4MicroSlotting() {
           description: `${storageName}...`,
         });
 
+        // Los SKUs que "rebalsaron" del equipo anterior se asignan temporalmente a este equipo
+        const currentMapping = { ...basePayload.sku_storage_mapping };
+        currentSpillover.forEach((skuId) => {
+          currentMapping[skuId] = storageName;
+        });
+
         const payload = {
           ...basePayload,
+          sku_storage_mapping: currentMapping,
           storages: [storage],
         };
 
@@ -303,6 +311,14 @@ export function Step4MicroSlotting() {
         const raw = await response.json();
         const resultsByStorage = raw?.results_by_storage ?? raw?.data?.results_by_storage ?? {};
         accumulatedResultsByStorage = { ...accumulatedResultsByStorage, ...resultsByStorage };
+
+        // Actualizamos el spillover con los SKUs que no entraron en ESTE equipo
+        const stResults = resultsByStorage[storageName] as Record<string, unknown> | undefined;
+        if (stResults && Array.isArray(stResults.unassigned_skus)) {
+          currentSpillover = stResults.unassigned_skus as string[];
+        } else {
+          currentSpillover = [];
+        }
       }
 
       let bestTrays: import("@/context/SlottingContext").BestTrayItem[] = [];
@@ -331,7 +347,8 @@ export function Step4MicroSlotting() {
           skus_placed: skusPlaced,
           avg_area_occupancy_pct: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
           optimized: true,
-        },
+          unassigned_skus: currentSpillover,
+        } as Record<string, unknown>,
         heightEfficiency: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
         areaEfficiency: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
         avgTraysPerOrder: 0,
@@ -365,6 +382,7 @@ export function Step4MicroSlotting() {
   };
 
   const micro = state.microResult;
+  const finalUnassignedSkus = ((micro?.kpi as Record<string, unknown>)?.unassigned_skus as string[]) ?? [];
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(30);
@@ -609,6 +627,35 @@ export function Step4MicroSlotting() {
               <p className="text-xs text-muted-foreground max-w-md">
                 Esto puede demorar un par de minutos. No cierres esta ventana ni recargues la página.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Advertencia de SKUs no asignados al final de la cascada */}
+      {finalUnassignedSkus.length > 0 && !isMicroRunning && (
+        <Card className="border-red-500/50 bg-red-500/10 mb-6">
+          <CardContent className="flex items-start gap-3 py-4">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="w-full">
+              <p className="text-sm font-bold text-red-800 dark:text-red-400">
+                Atención: SKUs sin ubicar ({finalUnassignedSkus.length})
+              </p>
+              <p className="text-xs text-red-700/80 dark:text-red-300 mt-0.5 mb-3">
+                Los siguientes SKUs pasaron por toda la cascada de almacenamiento pero no pudieron ser ubicados físicamente en ningún equipo debido a restricciones de capacidad, peso o dimensiones.
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {finalUnassignedSkus.slice(0, 30).map((sku) => (
+                  <Badge key={sku} variant="outline" className="text-[10px] bg-white dark:bg-black/20 font-mono">
+                    {sku}
+                  </Badge>
+                ))}
+                {finalUnassignedSkus.length > 30 && (
+                  <Badge variant="outline" className="text-[10px] bg-white dark:bg-black/20">
+                    + {finalUnassignedSkus.length - 30} más
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
