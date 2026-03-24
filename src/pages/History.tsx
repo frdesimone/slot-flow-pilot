@@ -318,7 +318,7 @@ export default function History() {
                             </p>
                             <div className="flex flex-wrap gap-4 mt-3 text-sm">
                               <span>
-                                <strong>Bandejas:</strong> {exec.kpi_results.total_trays ?? 0}
+                                <strong>Ubicaciones:</strong> {exec.kpi_results.total_trays ?? 0}
                               </span>
                               <span>
                                 <strong>Ocupación promedio:</strong>{" "}
@@ -328,6 +328,22 @@ export default function History() {
                                 <span className="text-primary font-medium">Optimizado</span>
                               )}
                             </div>
+                            {(() => {
+                              const kpis = (exec.params as Record<string, unknown> | null)?.kpis_by_storage as Record<string, Record<string, unknown>> | undefined;
+                              if (!kpis) return null;
+                              return (
+                                <div className="flex flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
+                                  {Object.entries(kpis).map(([st, kpi]) => (
+                                    <div key={st} className="border rounded px-2 py-1 bg-muted/30">
+                                      <span className="font-medium">{st}:</span>{" "}
+                                      {formatNum(kpi?.total_wasted_vol)} m³ aire |{" "}
+                                      {kpi?.orders_satisfied ?? 0}/{kpi?.total_orders ?? 0} pedidos ({kpi?.orders_satisfied_pct ?? 0}%) |{" "}
+                                      {kpi?.avg_inventory_days ?? 0} días inv.
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                           <Button
                             variant="outline"
@@ -407,7 +423,7 @@ export default function History() {
                           <Package className="w-4 h-4 text-primary" /> {String(st.storage_type ?? `Equipo ${i + 1}`)}
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-2 text-xs">
-                          <div><span className="text-muted-foreground block mb-0.5">Máx Bandejas:</span> {st.max_trays}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Máx Ubicaciones:</span> {st.max_trays}</div>
                           <div><span className="text-muted-foreground block mb-0.5">Dimensión:</span> {st.tray_length}x{st.tray_width}x{st.is_variable_height ? "Var" : st.max_h_loc}m</div>
                           <div><span className="text-muted-foreground block mb-0.5">Peso Máx:</span> {st.max_weight} kg</div>
                           <div><span className="text-muted-foreground block mb-0.5">Multiproducto:</span> {st.is_multiproduct ? "Sí" : "No"}</div>
@@ -421,6 +437,37 @@ export default function History() {
                 </div>
               </div>
             )}
+            {/* KPIs por Storage Type (solo micro) */}
+            {selectedExec?.type === "micro" && (() => {
+              const kpis = (selectedExec.data.params as Record<string, unknown> | null)?.kpis_by_storage as Record<string, Record<string, unknown>> | undefined;
+              if (!kpis || Object.keys(kpis).length === 0) return null;
+              return (
+                <div className="space-y-3 mt-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2 border-b pb-2">
+                    <LayoutGrid className="w-4 h-4" />
+                    KPIs por Tipo de Almacenamiento
+                  </h4>
+                  {Object.entries(kpis).map(([st, kpi]) => (
+                    <Card key={st} className="bg-muted/30 shadow-sm border-l-4 border-l-blue-500">
+                      <CardContent className="p-4">
+                        <div className="font-bold text-sm mb-3 flex items-center gap-2">
+                          <Package className="w-4 h-4 text-blue-500" /> {st}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-2 text-xs">
+                          <div><span className="text-muted-foreground block mb-0.5">Ubicaciones:</span> {kpi?.total_trays ?? 0}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">SKUs Colocados:</span> {kpi?.skus_placed ?? 0}</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Ocupación:</span> {formatNum(kpi?.avg_area_occupancy_pct)}%</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Aire Desperdiciado:</span> {formatNum(kpi?.total_wasted_vol)} m³</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Pedidos Satisfechos:</span> {kpi?.orders_satisfied ?? 0} / {kpi?.total_orders ?? 0} ({kpi?.orders_satisfied_pct ?? 0}%)</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Días de Inventario:</span> {kpi?.avg_inventory_days ?? 0} días</div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
+
             <h4 className="text-sm font-semibold flex items-center gap-2 border-b pb-2 mt-6">
               <Layers3 className="w-4 h-4" />
               Resultados y Exportación
@@ -428,7 +475,7 @@ export default function History() {
             <p className="text-xs text-muted-foreground">
               {selectedExec?.type === "macro"
                 ? `Se procesaron y asignaron ${selectedExec?.data.output_data?.length ?? 0} SKUs en esta ejecución.`
-                : `Se generaron ${selectedExec?.data.output_data?.length ?? 0} ubicaciones/bandejas físicas.`}
+                : `Se generaron ${selectedExec?.data.output_data?.length ?? 0} ubicaciones físicas.`}
               <br />
               Haz clic en el botón de abajo para obtener el detalle minucioso completo.
             </p>

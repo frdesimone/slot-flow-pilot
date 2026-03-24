@@ -61,6 +61,18 @@ function getUniqueStorageTypes(macroResult: { macro_skus?: Array<Record<string, 
   return Array.from(seen).sort();
 }
 
+function getSkuCountsByStorageType(macroResult: { macro_skus?: Array<Record<string, unknown>> } | null): Record<string, number> {
+  if (!macroResult?.macro_skus?.length) return {};
+  const counts: Record<string, number> = {};
+  for (const row of macroResult.macro_skus as Array<Record<string, unknown>>) {
+    const st = String(row.storage_type ?? row.storageType ?? "").trim();
+    if (st && st.toUpperCase() !== "UNASSIGNED") {
+      counts[st] = (counts[st] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
   const locs = locations ?? [];
   const rows: string[][] = [
@@ -130,6 +142,8 @@ export function Step4MicroSlotting() {
 
   const macroResult = state.macroResult;
   const storageTypeList = useMemo(() => getUniqueStorageTypes(macroResult), [macroResult]);
+  const skuCountsByStorage = useMemo(() => getSkuCountsByStorageType(macroResult), [macroResult]);
+  const totalMacroSkus = useMemo(() => Object.values(skuCountsByStorage).reduce((a, b) => a + b, 0), [skuCountsByStorage]);
   const vlmSkusIds = getVlmSkusIds(macroResult);
   const hasMacroResults = (macroResult?.macro_skus?.length ?? 0) > 0;
 
@@ -359,7 +373,7 @@ export function Step4MicroSlotting() {
       completeStep(3);
       toast({
         title: "Micro-Slotting completado",
-        description: `${totalStorages} equipo(s) procesado(s). ${totalTrays} bandejas asignadas.`,
+        description: `${totalStorages} equipo(s) procesado(s). ${totalTrays} ubicaciones asignadas.`,
       });
     } catch (error) {
       console.error(error);
@@ -521,12 +535,17 @@ export function Step4MicroSlotting() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Micro-Slotting: Distribución Física</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure el hardware y algoritmos de clustering para la asignación física de bandejas.
+            Configure el hardware y algoritmos de clustering para la asignación física de ubicaciones.
           </p>
           {hasMacroResults && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {storageTypeList.length} tipo(s) de almacenamiento: {storageTypeList.join(", ")}. {vlmSkusIds.length} SKUs para VLM.
-            </p>
+            <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+              <p>{totalMacroSkus} SKUs asignados en {storageTypeList.length} tipo(s) de almacenamiento:</p>
+              <ul className="list-disc list-inside ml-1">
+                {storageTypeList.map((st) => (
+                  <li key={st}><strong>{st}</strong>: {skuCountsByStorage[st] ?? 0} SKUs</li>
+                ))}
+              </ul>
+            </div>
           )}
           {!weightsValid && (
             <p className="text-sm text-red-600 font-medium mt-2">
@@ -571,7 +590,7 @@ export function Step4MicroSlotting() {
             <Settings2 className="w-4 h-4 text-kpi-icon" /> Configuración Avanzada de Pesos
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Los pesos definen cómo el algoritmo prioriza Afinidad, Rotación y Altura al agrupar SKUs en bandejas. La suma debe ser exactamente 100%.
+            Los pesos definen cómo el algoritmo prioriza Afinidad, Rotación y Altura al agrupar SKUs en ubicaciones. La suma debe ser exactamente 100%.
           </p>
         </div>
         <CardContent className="py-5">
@@ -620,9 +639,9 @@ export function Step4MicroSlotting() {
           <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
             <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <div className="text-center space-y-1">
-              <p className="text-sm font-medium">Analizando afinidades y optimizando bandejas...</p>
+              <p className="text-sm font-medium">Analizando afinidades y optimizando ubicaciones...</p>
               <p className="text-xs text-muted-foreground max-w-md">
-                Procesando {vlmSkusIds.length} SKUs seleccionados por el Macro Slotting.
+                Procesando {totalMacroSkus} SKUs asignados por el Macro Slotting.
               </p>
               <p className="text-xs text-muted-foreground max-w-md">
                 Esto puede demorar un par de minutos. No cierres esta ventana ni recargues la página.
@@ -684,15 +703,13 @@ export function Step4MicroSlotting() {
               <TabsContent key={st} value={st} className="mt-6 space-y-4">
                 {/* KPIs por Tab */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  <KPIMini label="Bandejas usadas" value={resultsByStorage[st]?.kpi?.total_trays ?? 0} />
+                  <KPIMini label="Ubicaciones usadas" value={resultsByStorage[st]?.kpi?.total_trays ?? 0} />
                   <KPIMini label="Ocupación %" value={resultsByStorage[st]?.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
                   <KPIMini label="SKUs Colocados" value={resultsByStorage[st]?.kpi?.skus_placed ?? 0} />
                   <KPIMini label="Optimizado" value={resultsByStorage[st]?.kpi?.optimized ? "Sí" : "No"} />
-                  <div className="col-span-2 lg:col-span-4 flex items-center gap-2">
-                    <Badge variant="destructive" className="text-orange-600 bg-orange-100 border-orange-300 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800">
-                      Aire Desperdiciado Total: {formatNum(resultsByStorage[st]?.kpi?.total_wasted_vol)} m³
-                    </Badge>
-                  </div>
+                  <KPIMini label="Aire Desperdiciado" value={formatNum(resultsByStorage[st]?.kpi?.total_wasted_vol)} unit="m³" />
+                  <KPIMini label="Pedidos Satisfechos" value={`${resultsByStorage[st]?.kpi?.orders_satisfied ?? 0} / ${resultsByStorage[st]?.kpi?.total_orders ?? 0}`} unit={`(${resultsByStorage[st]?.kpi?.orders_satisfied_pct ?? 0}%)`} />
+                  <KPIMini label="Días de Inventario" value={resultsByStorage[st]?.kpi?.avg_inventory_days ?? 0} unit="días (prom.)" />
                 </div>
 
                 {/* Ubicaciones y Tablas */}
@@ -877,7 +894,7 @@ export function Step4MicroSlotting() {
         <Card className="border-dashed bg-muted/30">
           <CardContent className="py-10 px-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Aún no hay resultados. Configura los parámetros arriba y haz clic en <strong>Ejecutar Micro-Slotting</strong> para ver la distribución de bandejas.
+              Aún no hay resultados. Configura los parámetros arriba y haz clic en <strong>Ejecutar Micro-Slotting</strong> para ver la distribución de ubicaciones.
             </p>
           </CardContent>
         </Card>
