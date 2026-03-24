@@ -708,8 +708,8 @@ export function Step4MicroSlotting() {
                   <KPIMini label="SKUs Colocados" value={resultsByStorage[st]?.kpi?.skus_placed ?? 0} />
                   <KPIMini label="Optimizado" value={resultsByStorage[st]?.kpi?.optimized ? "Sí" : "No"} />
                   <KPIMini label="Aire Desperdiciado" value={formatNum(resultsByStorage[st]?.kpi?.total_wasted_vol)} unit="m³" />
-                  <KPIMini label="Pedidos Satisfechos" value={`${resultsByStorage[st]?.kpi?.orders_satisfied ?? 0} / ${resultsByStorage[st]?.kpi?.total_orders ?? 0}`} unit={`(${resultsByStorage[st]?.kpi?.orders_satisfied_pct ?? 0}%)`} />
-                  <KPIMini label="Días de Inventario" value={resultsByStorage[st]?.kpi?.avg_inventory_days ?? 0} unit="días (prom.)" />
+                  <KPIMini label="Pedidos Pickeables" value={`${resultsByStorage[st]?.kpi?.orders_satisfied ?? 0} / ${resultsByStorage[st]?.kpi?.total_orders ?? 0}`} unit={`(${resultsByStorage[st]?.kpi?.orders_satisfied_pct ?? 0}%)`} />
+                  <KPIMini label="Días de Inventario" value={resultsByStorage[st]?.kpi?.avg_inventory_days ?? 0} unit="días (prom. pond.)" />
                 </div>
 
                 {/* Ubicaciones y Tablas */}

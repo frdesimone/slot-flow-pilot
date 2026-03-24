@@ -458,7 +458,7 @@ export default function History() {
                           <div><span className="text-muted-foreground block mb-0.5">SKUs Colocados:</span> {kpi?.skus_placed ?? 0}</div>
                           <div><span className="text-muted-foreground block mb-0.5">Ocupación:</span> {formatNum(kpi?.avg_area_occupancy_pct)}%</div>
                           <div><span className="text-muted-foreground block mb-0.5">Aire Desperdiciado:</span> {formatNum(kpi?.total_wasted_vol)} m³</div>
-                          <div><span className="text-muted-foreground block mb-0.5">Pedidos Satisfechos:</span> {kpi?.orders_satisfied ?? 0} / {kpi?.total_orders ?? 0} ({kpi?.orders_satisfied_pct ?? 0}%)</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Pedidos Pickeables:</span> {kpi?.orders_satisfied ?? 0} / {kpi?.total_orders ?? 0} ({kpi?.orders_satisfied_pct ?? 0}%)</div>
                           <div><span className="text-muted-foreground block mb-0.5">Días de Inventario:</span> {kpi?.avg_inventory_days ?? 0} días</div>
                         </div>
                       </CardContent>
