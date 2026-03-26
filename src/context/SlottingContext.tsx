@@ -135,6 +135,7 @@ export interface LocationItem {
   surface: number;
   volume: number;
   replenishment_units: number;
+  rotation?: number;
 }
 
 export interface MicroLocation {
@@ -142,6 +143,8 @@ export interface MicroLocation {
   occupancy_pct?: number;
   max_height?: number;
   wasted_vol?: number;
+  sku_count?: number;
+  avg_rotation?: number;
   metrics: {
     used_weight: number;
     max_weight: number;
@@ -151,6 +154,21 @@ export interface MicroLocation {
     max_volume: number;
   };
   items: LocationItem[];
+}
+
+export interface UnassignedSkuDetail {
+  sku_id: string;
+  description?: string;
+  rotation?: number;
+  height_cm?: number;
+  width_cm?: number;
+  length_cm?: number;
+  weight_kg?: number;
+  volume_m3?: number;
+  cycle_units?: number;
+  cycle_volume_m3?: number;
+  orders_count?: number;
+  reason?: string;
 }
 
 export interface MicroResult {
@@ -163,6 +181,8 @@ export interface MicroResult {
     kpi: Record<string, unknown>;
     best_trays: BestTrayItem[];
     locations?: MicroLocation[];
+    unassigned_skus?: string[];
+    unassigned_skus_details?: UnassignedSkuDetail[];
   }>;
   heightEfficiency?: number;
   areaEfficiency?: number;
@@ -173,6 +193,8 @@ export interface MicroResult {
     skus_placed?: number;
     avg_area_occupancy_pct?: number;
     optimized?: boolean;
+    unassigned_skus?: string[];
+    unassigned_skus_details?: UnassignedSkuDetail[];
   };
 }
 

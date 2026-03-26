@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn, formatNum } from "@/lib/utils";
 
-type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc";
+type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc" | "rotation_desc" | "rotation_asc";
 
 function KPIMini({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
@@ -76,14 +76,18 @@ function getSkuCountsByStorageType(macroResult: { macro_skus?: Array<Record<stri
 function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
   const locs = locations ?? [];
   const rows: string[][] = [
-    ["Location ID", "Peso (kg)", "Superficie (m²)", "Volumen (m³)", "SKU", "Descripción", "Peso (KG)", "Superficie (m²)", "Volumen (m³)", "Unid. Reposición"],
+    ["Location ID", "SKUs", "Rot. prom.", "Peso (kg)", "Superficie (m²)", "Volumen (m³)", "#", "SKU", "Descripción", "Peso (KG)", "Superficie (m²)", "Volumen (m³)", "Unid. Reposición"],
   ];
   locs.forEach((loc) => {
     const items = loc?.items ?? [];
     const m = loc?.metrics ?? { used_weight: 0, max_weight: 0, used_surface: 0, max_surface: 0, used_volume: 0, max_volume: 0 };
+    const skuCount = String(loc?.sku_count ?? items.length);
+    const avgRot = String(loc?.avg_rotation ?? "");
     if (items.length === 0) {
       rows.push([
         String(loc?.location_id ?? ""),
+        skuCount,
+        avgRot,
         `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
         `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
         `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
@@ -93,14 +97,18 @@ function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
         "",
         "",
         "",
+        "",
       ]);
     } else {
-      items.forEach((item) => {
+      items.forEach((item, itemIdx) => {
         rows.push([
           String(loc?.location_id ?? ""),
+          skuCount,
+          avgRot,
           `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
           `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
           `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
+          String(itemIdx + 1),
           String(item?.sku ?? ""),
           String(item?.description ?? ""),
           String(item?.weight ?? ""),
@@ -283,6 +291,7 @@ export function Step4MicroSlotting() {
       let accumulatedResultsByStorage: Record<string, unknown> = {};
       const totalStorages = storages.length;
       let currentSpillover: string[] = [];
+      let currentUnassignedDetails: import("@/context/SlottingContext").UnassignedSkuDetail[] = [];
 
       for (let i = 0; i < storages.length; i++) {
         const storage = storages[i];
@@ -333,6 +342,8 @@ export function Step4MicroSlotting() {
         } else {
           currentSpillover = [];
         }
+        // Guardar detalles del último lote de no-asignados (se sobreescribe en cada iteración; al final queda el último storage)
+        currentUnassignedDetails = Array.isArray(stResults?.unassigned_skus_details) ? stResults.unassigned_skus_details as import("@/context/SlottingContext").UnassignedSkuDetail[] : [];
       }
 
       let bestTrays: import("@/context/SlottingContext").BestTrayItem[] = [];
@@ -362,6 +373,7 @@ export function Step4MicroSlotting() {
           avg_area_occupancy_pct: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
           optimized: true,
           unassigned_skus: currentSpillover,
+          unassigned_skus_details: currentUnassignedDetails,
         } as Record<string, unknown>,
         heightEfficiency: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
         areaEfficiency: occList.length ? occList.reduce((a, b) => a + b, 0) / occList.length : 0,
@@ -397,6 +409,7 @@ export function Step4MicroSlotting() {
 
   const micro = state.microResult;
   const finalUnassignedSkus = ((micro?.kpi as Record<string, unknown>)?.unassigned_skus as string[]) ?? [];
+  const finalUnassignedDetails = ((micro?.kpi as Record<string, unknown>)?.unassigned_skus_details as import("@/context/SlottingContext").UnassignedSkuDetail[]) ?? [];
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(30);
@@ -461,6 +474,10 @@ export function Step4MicroSlotting() {
       list.sort((a, b) => (Number(a?.occupancy_pct ?? 0) - Number(b?.occupancy_pct ?? 0)));
     } else if (sortBy === "items_desc") {
       list.sort((a, b) => ((b?.items?.length ?? 0) - (a?.items?.length ?? 0)));
+    } else if (sortBy === "rotation_desc") {
+      list.sort((a, b) => (Number(b?.avg_rotation ?? 0) - Number(a?.avg_rotation ?? 0)));
+    } else if (sortBy === "rotation_asc") {
+      list.sort((a, b) => (Number(a?.avg_rotation ?? 0) - Number(b?.avg_rotation ?? 0)));
     }
     return list;
   }, [locationsForActiveTab, searchTerm, sortBy]);
@@ -651,31 +668,58 @@ export function Step4MicroSlotting() {
         </Card>
       )}
 
-      {/* Advertencia de SKUs no asignados al final de la cascada */}
+      {/* SKUs sin ubicar al final de la cascada */}
       {finalUnassignedSkus.length > 0 && !isMicroRunning && (
         <Card className="border-red-500/50 bg-red-500/10 mb-6">
-          <CardContent className="flex items-start gap-3 py-4">
+          <div className="px-4 py-3 border-b border-red-200 dark:border-red-900 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-            <div className="w-full">
+            <div>
               <p className="text-sm font-bold text-red-800 dark:text-red-400">
-                Atención: SKUs sin ubicar ({finalUnassignedSkus.length})
+                SKUs sin ubicar ({finalUnassignedSkus.length})
               </p>
-              <p className="text-xs text-red-700/80 dark:text-red-300 mt-0.5 mb-3">
-                Los siguientes SKUs pasaron por toda la cascada de almacenamiento pero no pudieron ser ubicados físicamente en ningún equipo debido a restricciones de capacidad, peso o dimensiones.
+              <p className="text-xs text-red-700/80 dark:text-red-300 mt-0.5">
+                Pasaron por toda la cascada pero no pudieron asignarse a ningún tipo de almacenamiento.
               </p>
-              <div className="flex flex-wrap gap-1">
-                {finalUnassignedSkus.slice(0, 30).map((sku) => (
-                  <Badge key={sku} variant="outline" className="text-[10px] bg-white dark:bg-black/20 font-mono">
-                    {sku}
-                  </Badge>
-                ))}
-                {finalUnassignedSkus.length > 30 && (
-                  <Badge variant="outline" className="text-[10px] bg-white dark:bg-black/20">
-                    + {finalUnassignedSkus.length - 30} más
-                  </Badge>
-                )}
-              </div>
             </div>
+          </div>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="py-1 h-auto text-xs">SKU</TableHead>
+                  <TableHead className="py-1 h-auto text-xs">Descripción</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Rotación</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Alto (cm)</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Ancho (cm)</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Largo (cm)</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Peso (kg)</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Vol. ciclo (m³)</TableHead>
+                  <TableHead className="py-1 h-auto text-xs text-right">Pedidos</TableHead>
+                  <TableHead className="py-1 h-auto text-xs">Motivo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {finalUnassignedDetails.length > 0 ? finalUnassignedDetails.map((d) => (
+                  <TableRow key={d.sku_id} className="text-xs">
+                    <TableCell className="py-1 font-mono font-medium">{d.sku_id}</TableCell>
+                    <TableCell className="py-1">{d.description ?? ""}</TableCell>
+                    <TableCell className="py-1 text-right">{formatNum(d.rotation)}</TableCell>
+                    <TableCell className="py-1 text-right">{formatNum(d.height_cm)}</TableCell>
+                    <TableCell className="py-1 text-right">{formatNum(d.width_cm)}</TableCell>
+                    <TableCell className="py-1 text-right">{formatNum(d.length_cm)}</TableCell>
+                    <TableCell className="py-1 text-right">{formatNum(d.weight_kg)}</TableCell>
+                    <TableCell className="py-1 text-right">{formatNum(d.cycle_volume_m3)}</TableCell>
+                    <TableCell className="py-1 text-right">{d.orders_count ?? 0}</TableCell>
+                    <TableCell className="py-1 text-muted-foreground max-w-xs truncate">{d.reason ?? ""}</TableCell>
+                  </TableRow>
+                )) : finalUnassignedSkus.map((sku) => (
+                  <TableRow key={sku} className="text-xs">
+                    <TableCell className="py-1 font-mono font-medium">{sku}</TableCell>
+                    <TableCell colSpan={9} className="py-1 text-muted-foreground">—</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       )}
@@ -746,7 +790,9 @@ export function Step4MicroSlotting() {
                       <SelectContent>
                         <SelectItem value="occupancy_desc">Mayor Ocupación</SelectItem>
                         <SelectItem value="occupancy_asc">Menor Ocupación</SelectItem>
-                        <SelectItem value="items_desc">Más Items</SelectItem>
+                        <SelectItem value="items_desc">Más SKUs</SelectItem>
+                        <SelectItem value="rotation_desc">Mayor Rotación (prom.)</SelectItem>
+                        <SelectItem value="rotation_asc">Menor Rotación (prom.)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -794,9 +840,15 @@ export function Step4MicroSlotting() {
                               >
                                 <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b py-2 px-4">
                                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                                    <CardTitle className="text-sm font-bold">
-                                      Ubicación: {location?.location_id ?? `Loc-${idx + 1}`}
-                                    </CardTitle>
+                                    <div>
+                                      <CardTitle className="text-sm font-bold">
+                                        Ubicación: {location?.location_id ?? `Loc-${idx + 1}`}
+                                      </CardTitle>
+                                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        {location?.sku_count ?? items.length} SKU{(location?.sku_count ?? items.length) !== 1 ? "s" : ""}
+                                        {location?.avg_rotation != null ? ` · Rot. prom.: ${formatNum(location.avg_rotation)}` : ""}
+                                      </p>
+                                    </div>
                                     <div className="flex flex-wrap gap-2">
                                       <Badge
                                         variant={m.used_weight > m.max_weight && m.max_weight > 0 ? "destructive" : "secondary"}
@@ -817,6 +869,7 @@ export function Step4MicroSlotting() {
                                   <Table>
                                     <TableHeader className="bg-muted/50">
                                       <TableRow>
+                                        <TableHead className="py-1 h-auto text-xs w-8 text-center">#</TableHead>
                                         <TableHead className="py-1 h-auto text-xs">SKU</TableHead>
                                         <TableHead className="py-1 h-auto text-xs">Descripción</TableHead>
                                         <TableHead className="py-1 h-auto text-xs text-right">Peso (KG)</TableHead>
@@ -838,6 +891,7 @@ export function Step4MicroSlotting() {
                                           onDragEnd={() => setDraggedSku(null)}
                                           className="cursor-grab active:cursor-grabbing hover:bg-muted/60 transition-colors"
                                         >
+                                          <TableCell className="py-1 text-xs text-center text-muted-foreground tabular-nums">{itemIdx + 1}</TableCell>
                                           <TableCell className="py-1 text-xs font-medium">{item?.sku ?? "-"}</TableCell>
                                           <TableCell className="py-1 text-xs">{item?.description ?? ""}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.weight)}</TableCell>
