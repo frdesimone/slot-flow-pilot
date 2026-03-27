@@ -1,4 +1,4 @@
-import { SlottingProvider, useSlotting } from "@/context/SlottingContext";
+import { useSlotting } from "@/context/SlottingContext";
 import { WizardLayout } from "@/components/WizardLayout";
 import { Step1DataIngestion } from "@/components/steps/Step1DataIngestion";
 import { Step2DataAudit } from "@/components/steps/Step2DataAudit";
@@ -19,11 +19,7 @@ function StepRouter() {
 }
 
 const Index = () => {
-  return (
-    <SlottingProvider>
-      <StepRouter />
-    </SlottingProvider>
-  );
+  return <StepRouter />;
 };
 
 export default Index;
