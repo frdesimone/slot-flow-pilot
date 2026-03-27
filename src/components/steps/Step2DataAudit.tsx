@@ -128,7 +128,7 @@ function formatOutlierDisplay(
   const val = (item as Record<string, unknown>)?.value;
   let valStr = "";
   if (typeof val === "number") {
-    if (attribute === "frequency") valStr = `${(val * 100).toFixed(2)}%`;
+    if (attribute === "frequency") valStr = `${formatNum(val * 100)}%`;
     else if (attribute === "weight") valStr = `${val} kg`;
     else if (attribute === "volume") valStr = `${val} m³`;
     else if (attribute === "lines") valStr = `${val} líneas`;

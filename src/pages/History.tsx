@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 function formatNum(val: unknown): string {
   if (val == null || isNaN(Number(val))) return "0";
-  return Number(val).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+  return Number(val).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 /** Pesos guardados como fracción 0–1 en API Micro → porcentaje entero para la UI */
@@ -271,7 +271,7 @@ export default function History() {
                                   <strong>Total SKUs:</strong> {exec.kpi_results.total_skus ?? 0}
                                 </span>
                                 <span>
-                                  <strong>Vol. VLM:</strong> {vlmVol.toFixed(2)} m³
+                                  <strong>Vol. VLM:</strong> {vlmVol.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m³
                                 </span>
                                 <span>
                                   <strong>No asignados:</strong> {unassigned}
@@ -322,7 +322,7 @@ export default function History() {
                               </span>
                               <span>
                                 <strong>Ocupación promedio:</strong>{" "}
-                                {(exec.kpi_results.avg_area_occupancy_pct ?? 0).toFixed(1)}%
+                                {(exec.kpi_results.avg_area_occupancy_pct ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                               </span>
                               {exec.kpi_results.optimized && (
                                 <span className="text-primary font-medium">Optimizado</span>

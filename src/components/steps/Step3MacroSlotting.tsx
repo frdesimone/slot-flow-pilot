@@ -805,11 +805,11 @@ export function Step3MacroSlotting() {
                   </div>
                   <div className="space-y-1 text-sm">
                     <p><span className="text-muted-foreground">SKUs:</span> <strong>{alloc.skus_count}</strong></p>
-                    <p><span className="text-muted-foreground">Vol. usado:</span> <strong>{alloc.volume_used?.toFixed(1) ?? alloc.volume_used}</strong> m³</p>
-                    <p><span className="text-muted-foreground">Vol. objetivo:</span> <strong>{alloc.volume_target?.toFixed(1) ?? alloc.volume_target}</strong> m³</p>
+                    <p><span className="text-muted-foreground">Vol. usado:</span> <strong>{formatNum(alloc.volume_used)}</strong> m³</p>
+                    <p><span className="text-muted-foreground">Vol. objetivo:</span> <strong>{formatNum(alloc.volume_target)}</strong> m³</p>
                     <div className="pt-2">
                       <Progress value={Math.min(alloc.fill_percentage ?? 0, 100)} className="h-2" />
-                      <p className="text-xs text-muted-foreground mt-1">{alloc.fill_percentage?.toFixed(1) ?? alloc.fill_percentage}% llenado</p>
+                      <p className="text-xs text-muted-foreground mt-1">{formatNum(alloc.fill_percentage)}% llenado</p>
                     </div>
                   </div>
                 </CardContent>
