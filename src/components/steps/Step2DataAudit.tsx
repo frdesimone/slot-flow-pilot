@@ -176,6 +176,7 @@ export function Step2DataAudit() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [rules, setRules] = useState<OutlierRule[]>(() => [...DEFAULT_RULES]);
   const [configOpen, setConfigOpen] = useState(true);
   const [selectedSkusToExclude, setSelectedSkusToExclude] = useState<Set<string>>(new Set());
@@ -577,7 +578,7 @@ export function Step2DataAudit() {
               <Card
                 key={cat.id}
                 className={`border transition-colors cursor-pointer hover:bg-muted/50 hover:border-primary/50`}
-                onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                onClick={() => { setSelectedCategory(selectedCategory === cat.id ? null : cat.id); setCurrentPage(1); }}
               >
                 <CardContent className="flex items-center gap-4 py-5 px-5">
                   <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -602,7 +603,10 @@ export function Step2DataAudit() {
           {selectedCategory && (() => {
             const cat = getCategoryById(selectedCategory);
             const items = getCategoryItems(selectedCategory);
-            const displayItems = items.slice(0, 50) as Record<string, unknown>[];
+            const PAGE_SIZE = 50;
+            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const safePage = Math.min(currentPage, totalPages);
+            const displayItems = items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) as Record<string, unknown>[];
             return (
             <Card>
               <div className="px-5 py-4 border-b flex items-center justify-between flex-wrap gap-3">
@@ -618,7 +622,7 @@ export function Step2DataAudit() {
                     </label>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Mostrando los primeros 50 resultados (Total: {items.length})
+                    {items.length} resultados · página {safePage} de {totalPages}
                   </p>
                 </div>
                 <Button
@@ -643,8 +647,7 @@ export function Step2DataAudit() {
                         <TableHead className="w-10">Descartar</TableHead>
                         <TableHead className="font-semibold">Detalle</TableHead>
                         {(() => {
-                          const data = displayItems;
-                          const allKeys = [...new Set(data.flatMap((item) => Object.keys(item ?? {})))];
+                          const allKeys = [...new Set(displayItems.flatMap((item) => Object.keys(item ?? {})))];
                           const extra = allKeys.filter((h) => !["sku_id", "order_id", "id", "description"].includes(h));
                           return extra.map((h) => (
                             <TableHead key={h} className="capitalize">
@@ -690,10 +693,31 @@ export function Step2DataAudit() {
                   </Table>
                 )}
               </div>
-              {items.length > 50 && (
-                <p className="px-5 py-2 text-xs text-muted-foreground border-t">
-                  Mostrando los primeros 50 resultados (Total: {items.length})
-                </p>
+              {totalPages > 1 && (
+                <div className="px-5 py-3 border-t flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, items.length)} de {items.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                    >
+                      ← Anterior
+                    </Button>
+                    <span className="text-xs text-muted-foreground px-1">{safePage} / {totalPages}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                    >
+                      Siguiente →
+                    </Button>
+                  </div>
+                </div>
               )}
             </Card>
             );
