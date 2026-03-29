@@ -87,6 +87,7 @@ export interface AuditSummary {
 export interface AuditResultsRaw {
   summary?: AuditSummary;
   categories?: AuditCategory[];
+  unique_categories?: string[];
   validation?: {
     maestro?: DataValidationRaw | null;
     pedidos?: DataValidationRaw | null;

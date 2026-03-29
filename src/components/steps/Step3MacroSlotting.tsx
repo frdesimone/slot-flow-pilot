@@ -414,6 +414,10 @@ export function Step3MacroSlotting() {
   }, [tableRows]);
 
   const availableCategories = useMemo(() => {
+    // Fuente primaria: unique_categories del endpoint de auditoría (todas las categorías del dataset)
+    const fromAudit = auditResults?.unique_categories ?? [];
+    if (fromAudit.length > 0) return [...new Set([...fromAudit, ...uniqueCategories])].sort();
+    // Fallback: sample_data (solo primeras filas) + resultado macro si ya se corrió
     const fromSample = (auditResults?.validation?.maestro?.sample_data ?? []) as Record<string, unknown>[];
     const fromSampleCats = fromSample
       .map((r) => {
@@ -422,7 +426,7 @@ export function Step3MacroSlotting() {
       })
       .filter(Boolean);
     return [...new Set([...fromSampleCats, ...uniqueCategories])].sort();
-  }, [auditResults?.validation?.maestro?.sample_data, uniqueCategories]);
+  }, [auditResults?.unique_categories, auditResults?.validation?.maestro?.sample_data, uniqueCategories]);
 
   const filteredSkus = useMemo(() => {
     const rows = tableRows ?? [];

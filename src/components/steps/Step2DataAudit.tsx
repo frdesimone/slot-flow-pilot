@@ -469,7 +469,7 @@ export function Step2DataAudit() {
                               </Label>
                               <Input
                                 type="number"
-                                step={rule.attribute === "frequency" ? 0.01 : 0.1}
+                                step={rule.rule_type === "percentile" ? 1 : (rule.attribute === "frequency" || rule.attribute === "volume") ? 0.001 : 0.1}
                                 value={rule.min_val}
                                 onChange={(e) => updateRule(idx, { min_val: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                                 className="h-8 w-28 text-xs"
@@ -483,7 +483,7 @@ export function Step2DataAudit() {
                               </Label>
                               <Input
                                 type="number"
-                                step={rule.attribute === "frequency" ? 0.01 : 0.1}
+                                step={rule.rule_type === "percentile" ? 1 : (rule.attribute === "frequency" || rule.attribute === "volume") ? 0.001 : 0.1}
                                 value={rule.max_val}
                                 onChange={(e) => updateRule(idx, { max_val: e.target.value === "" ? "" : (parseFloat(e.target.value) || 0) })}
                                 className="h-8 w-28 text-xs"
