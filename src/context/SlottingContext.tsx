@@ -137,6 +137,7 @@ export interface LocationItem {
   volume: number;
   replenishment_units: number;
   rotation?: number;
+  inv_days?: number;
 }
 
 export interface MicroLocation {

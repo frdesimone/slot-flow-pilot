@@ -76,7 +76,7 @@ function getSkuCountsByStorageType(macroResult: { macro_skus?: Array<Record<stri
 function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
   const locs = locations ?? [];
   const rows: string[][] = [
-    ["Location ID", "SKUs", "Rot. prom.", "Peso (kg)", "Superficie (m²)", "Volumen (m³)", "#", "SKU", "Descripción", "Peso (KG)", "Superficie (m²)", "Volumen (m³)", "Unid. Reposición"],
+    ["Location ID", "SKUs", "Rot. prom.", "Peso (kg)", "Superficie (m²)", "Volumen (m³)", "#", "SKU", "Descripción", "Peso (KG)", "Superficie (m²)", "Volumen (m³)", "Unid. Reposición", "Días Inv."],
   ];
   locs.forEach((loc) => {
     const items = loc?.items ?? [];
@@ -91,6 +91,7 @@ function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
         `${formatNum(m.used_weight)}/${formatNum(m.max_weight)}`,
         `${formatNum(m.used_surface)}/${formatNum(m.max_surface)}`,
         `${formatNum(m.used_volume)}/${formatNum(m.max_volume)}`,
+        "",
         "",
         "",
         "",
@@ -115,6 +116,7 @@ function downloadMicroCSV(locations: MicroLocation[] | undefined | null) {
           String(item?.surface ?? ""),
           String(item?.volume ?? ""),
           String(item?.replenishment_units ?? ""),
+          String(item?.inv_days ?? ""),
         ]);
       });
     }
@@ -876,6 +878,7 @@ export function Step4MicroSlotting() {
                                         <TableHead className="py-1 h-auto text-xs text-right">Superficie (m²)</TableHead>
                                         <TableHead className="py-1 h-auto text-xs text-right">Volumen (m³)</TableHead>
                                         <TableHead className="py-1 h-auto text-xs text-right">Unid. Reposición</TableHead>
+                                        <TableHead className="py-1 h-auto text-xs text-right">Días Inv.</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -898,6 +901,7 @@ export function Step4MicroSlotting() {
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.surface)}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.volume)}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.replenishment_units)}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.inv_days)}</TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
