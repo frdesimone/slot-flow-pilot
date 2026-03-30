@@ -900,7 +900,7 @@ export function Step4MicroSlotting() {
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.weight)}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.surface)}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.volume, 3)}</TableCell>
-                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.replenishment_units)}</TableCell>
+                                          <TableCell className="py-1 text-xs text-right">{formatNum(item?.replenishment_units, 2)}</TableCell>
                                           <TableCell className="py-1 text-xs text-right">{formatNum(item?.inv_days)}</TableCell>
                                         </TableRow>
                                       ))}
