@@ -17,7 +17,7 @@ export function WizardSidebar() {
     <aside className="w-72 min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       {/* Header */}
       <div className="px-5 py-6 border-b border-sidebar-border">
-        <img src="/logo-bremen.jpeg" alt="Logo" className="w-full object-contain max-h-16" />
+        <h1 className="text-lg font-semibold text-center">Slotting Optimizer</h1>
       </div>
 
       {/* Steps */}
