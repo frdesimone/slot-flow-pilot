@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Admin() {
@@ -38,6 +38,11 @@ export default function Admin() {
   const [newEmail, setNewEmail] = useState("");
   const [newIsAdmin, setNewIsAdmin] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Reset password modal
+  const [resetTarget, setResetTarget] = useState<AuthUser | null>(null);
+  const [resetPwd, setResetPwd] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -80,6 +85,32 @@ export default function Admin() {
       toast.success(`Rol actualizado`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error actualizando rol");
+    }
+  };
+
+  const openResetPassword = (u: AuthUser) => {
+    setResetTarget(u);
+    setResetPwd("");
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    if (resetPwd.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    setResetting(true);
+    try {
+      await apiJson(`/api/v1/admin/users/${resetTarget.id}`, "PATCH", {
+        password: resetPwd,
+      });
+      toast.success(`Contraseña de ${resetTarget.username} actualizada`);
+      setResetTarget(null);
+      setResetPwd("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error actualizando contraseña");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -193,6 +224,7 @@ export default function Admin() {
                   <TableHead>Creado</TableHead>
                   <TableHead>Admin</TableHead>
                   <TableHead>Activo</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -219,6 +251,16 @@ export default function Admin() {
                           onCheckedChange={(v) => handleToggleActive(u, v)}
                         />
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openResetPassword(u)}
+                        >
+                          <KeyRound className="w-4 h-4 mr-1" />
+                          Password
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -226,6 +268,40 @@ export default function Admin() {
             </Table>
           )}
         </div>
+
+        {/* Modal: Cambiar contraseña */}
+        <Dialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Cambiar contraseña — {resetTarget?.username}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="reset-pwd">Nueva contraseña (mín. 6)</Label>
+                <Input
+                  id="reset-pwd"
+                  type="password"
+                  value={resetPwd}
+                  onChange={(e) => setResetPwd(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleResetPassword();
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResetTarget(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleResetPassword} disabled={resetting}>
+                {resetting ? "Guardando…" : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
