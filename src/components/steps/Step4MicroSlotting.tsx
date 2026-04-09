@@ -747,12 +747,41 @@ export function Step4MicroSlotting() {
               <TabsContent key={st} value={st} className="mt-6 space-y-4">
                 {/* KPIs por Tab */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  <KPIMini label="Ubicaciones usadas" value={resultsByStorage[st]?.kpi?.total_trays ?? 0} />
-                  <KPIMini label="Ocupación %" value={resultsByStorage[st]?.kpi?.avg_area_occupancy_pct ?? 0} unit="%" />
-                  <KPIMini label="SKUs Colocados" value={resultsByStorage[st]?.kpi?.skus_placed ?? 0} />
-                  <KPIMini label="Optimizado" value={resultsByStorage[st]?.kpi?.optimized ? "Sí" : "No"} />
-                  <KPIMini label="Aire Desperdiciado" value={formatNum(resultsByStorage[st]?.kpi?.total_wasted_vol)} unit="m³" />
-                  <KPIMini label="Pedidos Pickeables" value={`${resultsByStorage[st]?.kpi?.orders_satisfied ?? 0} / ${resultsByStorage[st]?.kpi?.total_orders ?? 0}`} unit={`(${resultsByStorage[st]?.kpi?.orders_satisfied_pct ?? 0}%)`} />
+                  <KPIMini
+                    label="Ubicaciones usadas"
+                    value={`${resultsByStorage[st]?.kpi?.total_trays ?? 0} / ${resultsByStorage[st]?.kpi?.max_locations ?? 0}`}
+                    unit={`(${resultsByStorage[st]?.kpi?.locations_used_pct ?? 0}%)`}
+                  />
+                  <KPIMini
+                    label="SKUs ubicados"
+                    value={`${resultsByStorage[st]?.kpi?.skus_placed ?? 0} / ${resultsByStorage[st]?.kpi?.total_skus_universe ?? 0}`}
+                    unit={`(${resultsByStorage[st]?.kpi?.skus_placed_pct ?? 0}%)`}
+                  />
+                  <KPIMini
+                    label="Ocupación área"
+                    value={resultsByStorage[st]?.kpi?.avg_area_occupancy_pct ?? 0}
+                    unit="%"
+                  />
+                  <KPIMini
+                    label="Ocupación volumétrica"
+                    value={formatNum(resultsByStorage[st]?.kpi?.used_volume_m3, 2)}
+                    unit={`m³ (${resultsByStorage[st]?.kpi?.volume_occupancy_pct ?? 0}%)`}
+                  />
+                  <KPIMini
+                    label="Peso utilizado"
+                    value={formatNum(resultsByStorage[st]?.kpi?.used_weight_kg, 1)}
+                    unit={`kg (${resultsByStorage[st]?.kpi?.weight_used_pct ?? 0}%)`}
+                  />
+                  <KPIMini
+                    label="Pedidos pickeables"
+                    value={`${resultsByStorage[st]?.kpi?.orders_satisfied ?? 0} / ${resultsByStorage[st]?.kpi?.total_orders ?? 0}`}
+                    unit={`(${resultsByStorage[st]?.kpi?.orders_satisfied_pct ?? 0}%)`}
+                  />
+                  <KPIMini
+                    label="Líneas pickeables"
+                    value={`${resultsByStorage[st]?.kpi?.pickable_lines ?? 0} / ${resultsByStorage[st]?.kpi?.total_lines ?? 0}`}
+                    unit={`(${resultsByStorage[st]?.kpi?.pickable_lines_pct ?? 0}%)`}
+                  />
                   <KPIMini label="Días de Inventario" value={resultsByStorage[st]?.kpi?.avg_inventory_days ?? 0} unit="días (prom. pond.)" />
                 </div>
 
