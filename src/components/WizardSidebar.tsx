@@ -17,7 +17,7 @@ export function WizardSidebar() {
   const { logoUrl } = useAuth();
 
   return (
-    <aside className="w-72 min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+    <aside className="w-72 h-screen sticky top-0 flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border self-start overflow-y-auto">
       {/* Header: logo del usuario o fallback de texto */}
       <div className="px-5 py-6 border-b border-sidebar-border flex items-center justify-center min-h-[88px]">
         {logoUrl ? (
