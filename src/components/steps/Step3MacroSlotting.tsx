@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatNum } from "@/lib/utils";
 import { apiFetch, apiJson } from "@/lib/apiClient";
@@ -747,10 +747,33 @@ export function Step3MacroSlotting() {
                       </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-56 max-h-64 overflow-y-auto" align="start">
-                        {availableCategories.length > 0 ? (
-                          availableCategories.map((cat: string) => {
-                            const currentCats = safe.categories ?? [];
+                        <DropdownMenuItem
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            updateStorageType(idx, "categories", []);
+                          }}
+                          className="font-medium"
+                        >
+                          Limpiar (Todas)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {(() => {
+                          const currentCats = safe.categories ?? [];
+                          // Categorías "huérfanas": seleccionadas pero no presentes en el dataset actual
+                          const orphanCats = currentCats.filter(
+                            (c: string) => !availableCategories.includes(c),
+                          );
+                          const allOptions = [...availableCategories, ...orphanCats];
+                          if (allOptions.length === 0) {
+                            return (
+                              <div className="p-2 text-sm text-muted-foreground">
+                                No hay categorías en auditoría
+                              </div>
+                            );
+                          }
+                          return allOptions.map((cat: string) => {
                             const isSelected = currentCats.includes(cat);
+                            const isOrphan = orphanCats.includes(cat);
                             return (
                               <DropdownMenuCheckboxItem
                                 key={cat}
@@ -762,13 +785,14 @@ export function Step3MacroSlotting() {
                                   updateStorageType(idx, "categories", newCats);
                                 }}
                               >
-                                {cat}
+                                <span className={isOrphan ? "text-muted-foreground italic" : ""}>
+                                  {cat}
+                                  {isOrphan ? " (no vigente)" : ""}
+                                </span>
                               </DropdownMenuCheckboxItem>
                             );
-                          })
-                        ) : (
-                          <div className="p-2 text-sm text-muted-foreground">No hay categorías en auditoría</div>
-                        )}
+                          });
+                        })()}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
