@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { formatNum } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiClient";
 
 export interface OutlierRule {
   id: string;
@@ -237,11 +238,8 @@ export function Step2DataAudit() {
         formData.append(key, value);
       });
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/outliers`, {
+      const response = await apiFetch("/api/v1/outliers", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-        },
         body: formData,
       });
 

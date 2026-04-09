@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useSlotting } from "@/context/SlottingContext";
+import { useAuth } from "@/context/AuthContext";
+import { UserMenu } from "@/components/UserMenu";
 import { Check, Database, Search, Layers3, LayoutGrid, Clock } from "lucide-react";
 
 const steps = [
@@ -12,12 +14,21 @@ const steps = [
 export function WizardSidebar() {
   const navigate = useNavigate();
   const { state, setStep } = useSlotting();
+  const { logoUrl } = useAuth();
 
   return (
     <aside className="w-72 min-h-screen flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-      {/* Header */}
-      <div className="px-5 py-6 border-b border-sidebar-border">
-        <h1 className="text-lg font-semibold text-center">Slotting Optimizer</h1>
+      {/* Header: logo del usuario o fallback de texto */}
+      <div className="px-5 py-6 border-b border-sidebar-border flex items-center justify-center min-h-[88px]">
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="max-h-12 max-w-full object-contain"
+          />
+        ) : (
+          <h1 className="text-lg font-semibold text-center">Slotting Optimizer</h1>
+        )}
       </div>
 
       {/* Steps */}
@@ -59,7 +70,7 @@ export function WizardSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-sidebar-border space-y-3">
+      <div className="px-5 py-4 border-t border-sidebar-border space-y-2">
         <button
           onClick={() => navigate("/history")}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
@@ -67,7 +78,8 @@ export function WizardSidebar() {
           <Clock className="w-4 h-4" />
           Historial
         </button>
-        <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-wider">
+        <UserMenu />
+        <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-wider pt-1">
           Paso {state.currentStep + 1} de {steps.length}
         </p>
       </div>

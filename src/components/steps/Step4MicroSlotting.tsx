@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn, formatNum } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiClient";
 
 type SortOption = "occupancy_desc" | "occupancy_asc" | "items_desc" | "rotation_desc" | "rotation_asc";
 
@@ -320,11 +321,8 @@ export function Step4MicroSlotting() {
         formData.append("file", state.dataFile);
         formData.append("payload", JSON.stringify(payload));
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/micro`, {
+        const response = await apiFetch("/api/v1/micro", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-          },
           body: formData,
         });
 

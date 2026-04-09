@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/components/ui/use-toast";
+import { apiFetch } from "@/lib/apiClient";
 
 function DropZone({
   title,
@@ -114,7 +115,7 @@ export function Step1DataIngestion() {
 
   const handleDownloadTemplate = useCallback(async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/template`, {
+      const response = await apiFetch("/api/v1/template", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(state.mappingConfig),

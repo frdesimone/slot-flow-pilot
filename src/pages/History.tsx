@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { apiJson } from "@/lib/apiClient";
 
 function formatNum(val: unknown): string {
   if (val == null || isNaN(Number(val))) return "0";
@@ -166,15 +167,7 @@ export default function History() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/history`, {
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-          },
-        });
-        if (!res.ok) {
-          throw new Error(res.statusText || "Error al cargar historial");
-        }
-        const json = (await res.json()) as HistoryResponse;
+        const json = await apiJson<HistoryResponse>("/api/v1/history");
         setData(json);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Error desconocido";

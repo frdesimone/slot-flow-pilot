@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import { cn, formatNum } from "@/lib/utils";
+import { apiFetch, apiJson } from "@/lib/apiClient";
 
 type MacroStorageType = {
   name: string;
@@ -217,11 +218,8 @@ export function Step3MacroSlotting() {
         formData.append(key, value);
       });
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/macro`, {
+      const response = await apiFetch("/api/v1/macro", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}`,
-        },
         body: formData,
       });
 
@@ -260,11 +258,7 @@ export function Step3MacroSlotting() {
   const handleRestoreParams = async () => {
     try {
       setIsRestoring(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/history`, {
-        headers: { Authorization: `Bearer ${import.meta.env.VITE_API_TOKEN}` },
-      });
-      if (!res.ok) throw new Error("Error al obtener historial");
-      const data = await res.json();
+      const data = await apiJson<{ macro?: Array<{ params?: { storage_types?: unknown[] } }> }>("/api/v1/history");
 
       const lastMacro = data?.macro?.[0];
       const savedStorages = lastMacro?.params?.storage_types;
