@@ -234,9 +234,15 @@ export function Step2DataAudit() {
       }));
       formData.append("outliers_config", JSON.stringify(safeRules));
 
-      Object.entries(state.mappingConfig).forEach(([key, value]) => {
-        formData.append(key, value);
+      const mappingCfg = state.mappingConfig;
+      Object.entries(mappingCfg).forEach(([key, value]) => {
+        if (key === "replenishment_unit_mappings") return;
+        formData.append(key, String(value));
       });
+      const rumList = mappingCfg.replenishment_unit_mappings ?? [];
+      if (rumList.length > 0) {
+        formData.append("replenishment_unit_mappings_json", JSON.stringify(rumList));
+      }
 
       const response = await apiFetch("/api/v1/outliers", {
         method: "POST",
