@@ -264,7 +264,7 @@ export default function History() {
                                   <strong>Total SKUs:</strong> {exec.kpi_results.total_skus ?? 0}
                                 </span>
                                 <span>
-                                  <strong>Vol. VLM:</strong> {vlmVol.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m³
+                                  <strong>Vol. VLM:</strong> {formatNum(vlmVol)} m³
                                 </span>
                                 <span>
                                   <strong>No asignados:</strong> {unassigned}
@@ -315,7 +315,7 @@ export default function History() {
                               </span>
                               <span>
                                 <strong>Ocupación promedio:</strong>{" "}
-                                {(exec.kpi_results.avg_area_occupancy_pct ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                                {formatNum(exec.kpi_results.avg_area_occupancy_pct)}%
                               </span>
                               {exec.kpi_results.optimized && (
                                 <span className="text-primary font-medium">Optimizado</span>
@@ -330,8 +330,8 @@ export default function History() {
                                     <div key={st} className="border rounded px-2 py-1 bg-muted/30">
                                       <span className="font-medium">{st}:</span>{" "}
                                       {formatNum(kpi?.total_wasted_vol)} m³ aire |{" "}
-                                      {kpi?.orders_satisfied ?? 0}/{kpi?.total_orders ?? 0} pedidos ({kpi?.orders_satisfied_pct ?? 0}%) |{" "}
-                                      {kpi?.avg_inventory_days ?? 0} días inv.
+                                      {kpi?.orders_satisfied ?? 0}/{kpi?.total_orders ?? 0} pedidos ({formatNum(kpi?.orders_satisfied_pct)}%) |{" "}
+                                      {formatNum(kpi?.avg_inventory_days)} días inv.
                                     </div>
                                   ))}
                                 </div>
@@ -451,8 +451,8 @@ export default function History() {
                           <div><span className="text-muted-foreground block mb-0.5">SKUs Colocados:</span> {kpi?.skus_placed ?? 0}</div>
                           <div><span className="text-muted-foreground block mb-0.5">Ocupación:</span> {formatNum(kpi?.avg_area_occupancy_pct)}%</div>
                           <div><span className="text-muted-foreground block mb-0.5">Aire Desperdiciado:</span> {formatNum(kpi?.total_wasted_vol)} m³</div>
-                          <div><span className="text-muted-foreground block mb-0.5">Pedidos Pickeables:</span> {kpi?.orders_satisfied ?? 0} / {kpi?.total_orders ?? 0} ({kpi?.orders_satisfied_pct ?? 0}%)</div>
-                          <div><span className="text-muted-foreground block mb-0.5">Días de Inventario:</span> {kpi?.avg_inventory_days ?? 0} días</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Pedidos Pickeables:</span> {kpi?.orders_satisfied ?? 0} / {kpi?.total_orders ?? 0} ({formatNum(kpi?.orders_satisfied_pct)}%)</div>
+                          <div><span className="text-muted-foreground block mb-0.5">Días de Inventario:</span> {formatNum(kpi?.avg_inventory_days)} días</div>
                         </div>
                       </CardContent>
                     </Card>
