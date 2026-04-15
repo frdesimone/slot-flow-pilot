@@ -32,6 +32,7 @@ type MacroStorageType = {
   stackability_factor: number | string;
   enforce_integer_replenishment: boolean;
   round_to_one_threshold: number | string;
+  replenishment_unit_name: string;
 };
 
 type MacroSkuRow = {
@@ -67,6 +68,7 @@ const defaultStorage: MacroStorageType = {
   stackability_factor: 1,
   enforce_integer_replenishment: false,
   round_to_one_threshold: 0.25,
+  replenishment_unit_name: "",
 };
 
 function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknown> | undefined): MacroStorageType {
@@ -96,6 +98,7 @@ function ensureStorageType(st: Partial<MacroStorageType> | Record<string, unknow
       const n = typeof v === "number" ? v : parseFloat(String(v));
       return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.25;
     })(),
+    replenishment_unit_name: String(st.replenishment_unit_name ?? ""),
   };
 }
 
@@ -210,13 +213,20 @@ export function Step3MacroSlotting() {
           stackability_factor: Number(safe.stackability_factor) || 1,
           enforce_integer_replenishment: Boolean(safe.enforce_integer_replenishment),
           round_to_one_threshold: Math.max(0, Math.min(1, Number(safe.round_to_one_threshold) || 0.25)),
+          replenishment_unit_name: safe.replenishment_unit_name ?? "",
         };
       });
       formData.append("storage_types", JSON.stringify(safeStorageTypes));
 
-      Object.entries(state?.mappingConfig ?? {}).forEach(([key, value]) => {
-        formData.append(key, value);
+      const mappingConfig = state?.mappingConfig ?? {};
+      Object.entries(mappingConfig).forEach(([key, value]) => {
+        if (key === "replenishment_unit_mappings") return;
+        formData.append(key, String(value));
       });
+      const rumList = mappingConfig.replenishment_unit_mappings ?? [];
+      if (rumList.length > 0) {
+        formData.append("replenishment_unit_mappings_json", JSON.stringify(rumList));
+      }
 
       const response = await apiFetch("/api/v1/macro", {
         method: "POST",
@@ -315,6 +325,8 @@ export function Step3MacroSlotting() {
       } else if (field === "round_to_one_threshold") {
         const n = typeof value === "number" ? value : parseFloat(String(value));
         next[idx] = { ...current, round_to_one_threshold: (value === "" || !Number.isFinite(n)) ? (current.round_to_one_threshold ?? 0.25) : Math.max(0, Math.min(1, n)) };
+      } else if (field === "replenishment_unit_name") {
+        next[idx] = { ...current, replenishment_unit_name: String(value ?? "") };
       } else if (typeof value === "number" || value === "") {
         next[idx] = { ...current, [field]: value };
       } else {
@@ -795,6 +807,23 @@ export function Step3MacroSlotting() {
                         })()}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                  </div>
+                  <div className="flex flex-col gap-0.5 col-span-2 md:col-span-2 lg:col-span-1">
+                    <Label className="text-[11px] uppercase text-muted-foreground truncate">U. Reposición</Label>
+                    <Select
+                      value={safe.replenishment_unit_name || "__none__"}
+                      onValueChange={(val) => updateStorageType(idx, "replenishment_unit_name", val === "__none__" ? "" : val)}
+                    >
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Default</SelectItem>
+                        {(state.mappingConfig.replenishment_unit_mappings ?? []).filter((r) => r.name).map((r) => (
+                          <SelectItem key={r.name} value={r.name}>{r.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
           </div>
               </CardContent>

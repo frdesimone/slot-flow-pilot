@@ -278,13 +278,63 @@ export function Step1DataIngestion() {
                         className="h-8 text-xs"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">UM venta a UM reposición (col_cajas_m3)</Label>
-                      <Input
-                        value={state.mappingConfig.col_cajas_m3}
-                        onChange={(e) => setMappingConfig({ col_cajas_m3: e.target.value })}
-                        className="h-8 text-xs"
-                      />
+                    <div className="space-y-1.5 md:col-span-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Unidades de reposición</Label>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() =>
+                            setMappingConfig({
+                              replenishment_unit_mappings: [
+                                ...(state.mappingConfig.replenishment_unit_mappings ?? []),
+                                { name: "", column: "" },
+                              ],
+                            })
+                          }
+                        >
+                          + Agregar
+                        </button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {(state.mappingConfig.replenishment_unit_mappings ?? []).map((rum, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <Input
+                              placeholder="Nombre (ej: Caja)"
+                              value={rum.name}
+                              onChange={(e) => {
+                                const next = [...(state.mappingConfig.replenishment_unit_mappings ?? [])];
+                                next[idx] = { ...next[idx], name: e.target.value };
+                                setMappingConfig({ replenishment_unit_mappings: next });
+                              }}
+                              className="h-8 text-xs w-36 shrink-0"
+                            />
+                            <Input
+                              placeholder="Columna en Excel"
+                              value={rum.column}
+                              onChange={(e) => {
+                                const next = [...(state.mappingConfig.replenishment_unit_mappings ?? [])];
+                                next[idx] = { ...next[idx], column: e.target.value };
+                                setMappingConfig({ replenishment_unit_mappings: next });
+                              }}
+                              className="h-8 text-xs flex-1"
+                            />
+                            {(state.mappingConfig.replenishment_unit_mappings ?? []).length > 1 && (
+                              <button
+                                type="button"
+                                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                onClick={() => {
+                                  const next = (state.mappingConfig.replenishment_unit_mappings ?? []).filter((_, i) => i !== idx);
+                                  setMappingConfig({ replenishment_unit_mappings: next });
+                                }}
+                                aria-label="Eliminar"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Columna Categoría (col_categoria)</Label>

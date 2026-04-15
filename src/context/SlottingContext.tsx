@@ -200,6 +200,11 @@ export interface MicroResult {
   };
 }
 
+export interface ReplenishmentUnitMapping {
+  name: string;    // Nombre de la unidad, ej: "Caja", "Pallet"
+  column: string;  // Nombre de la columna en el Excel
+}
+
 export interface MappingConfig {
   period_days: number;
   sheet_maestro: string;
@@ -209,8 +214,8 @@ export interface MappingConfig {
   col_ancho: string;
   col_largo: string;
   col_desc: string;
-  col_cajas_m3: string;
   col_categoria: string;
+  replenishment_unit_mappings: ReplenishmentUnitMapping[];
   sheet_pedidos: string;
   col_pedido_id: string;
   col_pedido_sku: string;
@@ -288,8 +293,8 @@ const defaultMappingConfig: MappingConfig = {
   col_ancho: "Ancho (CM)",
   col_largo: "Largo (CM)",
   col_desc: "Descripción",
-  col_cajas_m3: "UM venta a UM reposición",
   col_categoria: "Categoría",
+  replenishment_unit_mappings: [{ name: "Caja", column: "UM venta a UM reposición" }],
   sheet_pedidos: "Pedidos",
   col_pedido_id: "Nro pedido",
   col_pedido_sku: "Codigo II - Producto",

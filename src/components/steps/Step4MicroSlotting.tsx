@@ -199,6 +199,7 @@ export function Step4MicroSlotting() {
         categories?: string[];
         enforce_integer_replenishment?: boolean;
         round_to_one_threshold?: number | string;
+        replenishment_unit_name?: string;
       }>;
 
       type StoragePayload = {
@@ -218,6 +219,7 @@ export function Step4MicroSlotting() {
         stackability_factor?: number;
         enforce_integer_replenishment?: boolean;
         round_to_one_threshold?: number;
+        replenishment_unit_name?: string;
       };
 
       const storages: StoragePayload[] =
@@ -246,6 +248,7 @@ export function Step4MicroSlotting() {
                 stackability_factor: Number(st?.stackability_factor ?? 1) || 1,
                 enforce_integer_replenishment: Boolean(st?.enforce_integer_replenishment ?? false),
                 round_to_one_threshold: Math.max(0, Math.min(1, Number(st?.round_to_one_threshold ?? 0.25) || 0.25)),
+                replenishment_unit_name: String(st?.replenishment_unit_name ?? "") || undefined,
               };
             })
           : storageTypeList.map((st) => ({
