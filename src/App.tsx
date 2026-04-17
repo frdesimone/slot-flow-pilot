@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import { SlottingProvider } from "@/context/SlottingContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AppFooter } from "@/components/AppFooter";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <AppFooter />
           </SlottingProvider>
         </AuthProvider>
       </BrowserRouter>
